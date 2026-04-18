@@ -69,6 +69,7 @@ def main() -> int:
     parser.add_argument("--translate", action="store_true", help="번역 Batch 제출")
     parser.add_argument("--collect",   action="store_true", help="번역 결과 수거")
     parser.add_argument("--images",    action="store_true", help="Cloudinary 이미지 업로드")
+    parser.add_argument("--index",     action="store_true", help="pgvector 임베딩 인덱스 구축")
     parser.add_argument("--all",       action="store_true", help="전체 실행")
     args = parser.parse_args()
 
@@ -78,9 +79,10 @@ def main() -> int:
         args.translate = True
         args.collect   = True
         args.images    = True
+        args.index     = True
 
     if not any([args.csv, args.sync, args.normalize, args.translate,
-                args.collect, args.images]):
+                args.collect, args.images, args.index]):
         parser.print_help()
         return 0
 
@@ -179,6 +181,19 @@ def main() -> int:
             from pipeline.image_pipeline import ImagePipeline
             result = ImagePipeline().run()
             step_ok(tag, f"업로드 {result.get('uploaded', 0)}, 스킵 {result.get('skipped', 0)}, 에러 {result.get('error', 0)}")
+        except Exception as exc:
+            return step_fail(tag, exc)
+
+    # ──────────────────────────────────────────────────────────────
+    # [1-8] pgvector 인덱스 구축
+    # ──────────────────────────────────────────────────────────────
+    if args.index:
+        tag = "1-8"
+        step_start(tag, "pgvector 임베딩 인덱스 구축  (text-embedding-3-small)")
+        try:
+            from pipeline.chatbot.chatbot import KCultureChatbot
+            indexed = KCultureChatbot().index_places(batch_size=500)
+            step_ok(tag, f"{indexed}건 임베딩 저장")
         except Exception as exc:
             return step_fail(tag, exc)
 
