@@ -1,0 +1,27 @@
+{
+  "kfood": {
+    "tourapi": ["39"],
+    "mois": ["일반음식점", "휴게음식점", "제과점영업"],
+    "mcst": ["식음료"]
+  },
+  "kbeauty": {
+    "mois": ["미용업", "네일숍", "피부미용업"]
+  },
+  "ktourism": {
+    "tourapi": ["12", "14", "25"]
+  },
+  "koptical": {
+    "mois": ["안경업"]
+  },
+  "kshopping": {
+    "tourapi": ["38"],
+    "mcst": ["쇼핑"]
+  },
+  "klodging": {
+    "tourapi": ["32"]
+  },
+  "kleisure": {
+    "tourapi": ["28", "75", "76"],
+    "mcst": ["레저·스포츠"]
+  }
+}

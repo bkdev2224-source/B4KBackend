@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c ':*)",
+      "Bash(python -c ':*)"
+    ],
+    "additionalDirectories": [
+      "c:\\Project\\b4kdatabase"
+    ]
+  }
+}

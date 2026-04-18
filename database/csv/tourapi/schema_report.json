@@ -1,0 +1,39 @@
+{
+  "file": "C:\\Project\\b4kdatabase\\database\\csv\\tourapi\\tour_kor.csv",
+  "columns": [
+    "addr1",
+    "addr2",
+    "areacode",
+    "cat1",
+    "cat2",
+    "cat3",
+    "contentid",
+    "contenttypeid",
+    "createdtime",
+    "firstimage",
+    "firstimage2",
+    "cpyrhtdivcd",
+    "mapx",
+    "mapy",
+    "mlevel",
+    "modifiedtime",
+    "sigungucode",
+    "tel",
+    "title",
+    "zipcode",
+    "ldongregncd",
+    "ldongsigngucd",
+    "lclssystm1",
+    "lclssystm2",
+    "lclssystm3"
+  ],
+  "row_count": 52874,
+  "id_column": "contentid",
+  "id_format": "numeric",
+  "coord_info": {
+    "lat_col": "mapy",
+    "lng_col": "mapx",
+    "crs": "WGS84"
+  },
+  "inspected_at": "2026-04-04T01:19:45.889674+00:00"
+}

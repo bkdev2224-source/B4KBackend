@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c ':*)",
+      "Bash(python scripts/init_db.py)",
+      "Bash(python scripts/init_db.py --reset)",
+      "Bash(python scripts/run_phase1.py --csv database/csv/tourapi/tour_kor.csv --normalize)",
+      "Bash(venv\\\\Scripts\\\\pip show:*)",
+      "Bash(venv/Scripts/pip show:*)",
+      "Bash(venv/Scripts/python -c ':*)",
+      "Bash(iconv -f cp949 -t utf-8)",
+      "Bash(venv/Scripts/python)",
+      "Bash(venv/Scripts/pip install:*)",
+      "Bash(venv/Scripts/python -c \"from jaro import jaro_winkler_metric; print\\('OK'\\)\")"
+    ]
+  }
+}

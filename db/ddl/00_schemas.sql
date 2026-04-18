@@ -1,0 +1,12 @@
+-- Phase 0-3: k_culture DB 스키마 초기화
+-- 실행 전제: k_culture 데이터베이스가 이미 생성되어 있어야 함
+
+-- Extensions
+CREATE EXTENSION IF NOT EXISTS postgis;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Schemas
+CREATE SCHEMA IF NOT EXISTS stage;
+CREATE SCHEMA IF NOT EXISTS core;
+CREATE SCHEMA IF NOT EXISTS service;
+CREATE SCHEMA IF NOT EXISTS "user";

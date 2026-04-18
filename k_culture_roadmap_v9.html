@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>K-Culture Roadmap v9</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+
+:root {
+  --bg:       #ffffff;
+  --bg2:      #f8f9fa;
+  --bg3:      #f1f3f5;
+  --bg4:      #e9ecef;
+  --border:   #dee2e6;
+  --border2:  #ced4da;
+  --text:     #212529;
+  --text2:    #495057;
+  --text3:    #868e96;
+  --blue:     #1c7ed6;
+  --blue-bg:  rgba(28,126,214,0.08);
+  --blue-b:   rgba(28,126,214,0.25);
+  --green:    #0ca678;
+  --green-bg: rgba(12,166,120,0.08);
+  --green-b:  rgba(12,166,120,0.25);
+  --amber:    #e67700;
+  --amber-bg: rgba(230,119,0,0.08);
+  --amber-b:  rgba(230,119,0,0.25);
+  --pink:     #d6336c;
+  --pink-bg:  rgba(214,51,108,0.08);
+  --pink-b:   rgba(214,51,108,0.25);
+  --purple:   #7048e8;
+  --purple-bg:rgba(112,72,232,0.08);
+  --purple-b: rgba(112,72,232,0.25);
+  --cyan:     #1098ad;
+  --cyan-bg:  rgba(16,152,173,0.08);
+  --cyan-b:   rgba(16,152,173,0.25);
+  --red:      #e03131;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Noto Sans KR', sans-serif;
+  --r: 8px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 12.5px;
+  line-height: 1.65;
+  padding: 28px 22px 80px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+/* ── 헤더 ── */
+.hd-badge {
+  font-family: var(--mono); font-size: 9px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--blue); background: var(--blue-bg);
+  border: 1px solid var(--blue-b);
+  padding: 3px 10px; border-radius: 4px;
+  display: inline-block; margin-bottom: 10px;
+}
+h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 5px; }
+.hd-sub { font-size: 11.5px; color: var(--text2); margin-bottom: 18px; }
+.hd-cards { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 28px; }
+.hd-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r); padding: 12px 14px; }
+.hd-card-label { font-family: var(--mono); font-size: 9px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); margin-bottom: 5px; }
+.hd-card-val { font-size: 11.5px; line-height: 1.6; }
+
+/* ── 섹션 타이틀 ── */
+.sec {
+  font-family: var(--mono); font-size: 9px; font-weight: 700;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--text3);
+  display: flex; align-items: center; gap: 10px;
+  margin: 32px 0 12px;
+}
+.sec::after { content:''; flex:1; height:1px; background: var(--border); }
+
+/* ── 파이프라인 배너 ── */
+.pipe-banner { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; margin-bottom: 20px; }
+.pipe-banner-title { padding: 9px 16px; font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); border-bottom: 1px solid var(--border); background: var(--bg3); }
+.pipe-nodes { display: flex; align-items: stretch; overflow-x: auto; }
+.pipe-node { flex: 1; min-width: 110px; padding: 12px 13px; border-right: 1px solid var(--border); position: relative; }
+.pipe-node:last-child { border-right: none; }
+.pipe-node-num { font-family: var(--mono); font-size: 9px; font-weight: 700; margin-bottom: 3px; }
+.pipe-node-name { font-size: 11px; font-weight: 700; margin-bottom: 3px; }
+.pipe-node-desc { font-size: 10px; color: var(--text2); line-height: 1.55; }
+.pipe-arrow { position: absolute; right: -7px; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--text3); z-index: 1; background: var(--bg2); padding: 0 1px; }
+.pn-collect  { border-top: 2px solid var(--blue); }
+.pn-sync     { border-top: 2px solid var(--cyan); }
+.pn-merge    { border-top: 2px solid var(--purple); }
+.pn-trans    { border-top: 2px solid var(--pink); }
+.pn-service  { border-top: 2px solid var(--green); }
+.pn-ai       { border-top: 2px solid var(--amber); }
+
+/* ── 타임라인 ── */
+.timeline { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; margin-bottom: 20px; }
+.tl-header { padding: 9px 16px; background: var(--bg3); border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); }
+.tl-row { display: grid; grid-template-columns: 88px 72px 1fr; border-bottom: 1px solid var(--border); align-items: stretch; }
+.tl-row:last-child { border-bottom: none; }
+.tl-phase { padding: 10px 12px; border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 2px; justify-content: center; }
+.tl-phase-name { font-family: var(--mono); font-size: 10px; font-weight: 700; }
+.tl-phase-est { font-family: var(--mono); font-size: 9px; color: var(--text3); }
+.tl-src { padding: 10px 12px; border-right: 1px solid var(--border); font-size: 11px; font-weight: 700; display: flex; align-items: center; }
+.tl-steps-list { padding: 10px 13px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.tl-badge { font-family: var(--mono); font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 3px; background: var(--bg4); color: var(--text2); border: 1px solid var(--border2); }
+.tl-badge.on { background: var(--blue-bg); color: var(--blue); border-color: var(--blue-b); }
+.tl-badge.reuse { background: var(--green-bg); color: var(--green); border-color: var(--green-b); }
+.tl-arr { color: var(--text3); font-size: 11px; }
+
+/* ── 소스 블록 ── */
+.source-block { border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; margin-bottom: 12px; }
+.source-block.src-tour  { border-top: 2px solid var(--blue); }
+.source-block.src-mois  { border-top: 2px solid var(--green); }
+.source-block.src-mcst  { border-top: 2px solid var(--pink); }
+.source-block.src-crawl { border-top: 2px solid var(--amber); }
+.source-block.src-core  { border-top: 2px solid var(--border2); }
+.sb-header { padding: 11px 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--bg2); border-bottom: 1px solid var(--border); }
+.sb-badge { font-family: var(--mono); font-size: 10px; font-weight: 700; padding: 2px 9px; border-radius: 4px; }
+.sb-tour  { background: var(--blue-bg);   color: var(--blue);   border: 1px solid var(--blue-b); }
+.sb-mois  { background: var(--green-bg);  color: var(--green);  border: 1px solid var(--green-b); }
+.sb-mcst  { background: var(--pink-bg);   color: var(--pink);   border: 1px solid var(--pink-b); }
+.sb-crawl { background: var(--amber-bg);  color: var(--amber);  border: 1px solid var(--amber-b); }
+.sb-title { font-size: 13px; font-weight: 700; }
+.sb-note  { margin-left: auto; font-family: var(--mono); font-size: 10px; color: var(--text3); }
+
+/* ── 스텝 그리드 ── */
+.steps { display: grid; grid-template-columns: 1fr 1fr; background: var(--bg2); }
+.step { padding: 12px 15px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.step:nth-child(2n) { border-right: none; }
+.step:nth-last-child(-n+2) { border-bottom: none; }
+.step.full { grid-column: 1/-1; border-right: none; }
+.step:last-child:nth-child(odd) { border-bottom: none; }
+.sn { font-family: var(--mono); font-size: 9px; color: var(--text3); margin-bottom: 4px; }
+.st { font-size: 12px; font-weight: 700; margin-bottom: 5px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.si { font-size: 11px; color: var(--text2); line-height: 1.7; white-space: pre-wrap; }
+.si b { color: var(--text); font-weight: 600; }
+.tags { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 3px; }
+.tag { font-family: var(--mono); font-size: 9px; font-weight: 600; padding: 1px 6px; border-radius: 3px; white-space: nowrap; }
+.t-ddl    { background: var(--blue-bg);    color: var(--blue); }
+.t-code   { background: var(--green-bg);   color: var(--green); }
+.t-api    { background: var(--cyan-bg);    color: var(--cyan); }
+.t-ai     { background: var(--purple-bg);  color: var(--purple); }
+.t-test   { background: var(--amber-bg);   color: var(--amber); }
+.t-auto   { background: var(--green-bg);   color: var(--green); }
+.t-json   { background: var(--amber-bg);   color: var(--amber); }
+.t-once   { background: rgba(255,107,107,0.08); color: var(--red); }
+.t-sync   { background: var(--cyan-bg);    color: var(--cyan); }
+.t-merge  { background: var(--purple-bg);  color: var(--purple); }
+.t-img    { background: var(--pink-bg);    color: var(--pink); }
+.t-csv    { background: var(--blue-bg);    color: var(--blue); }
+.t-new    { background: var(--green-bg);   color: var(--green); }
+.t-reuse  { background: var(--bg4);        color: var(--text3); border: 1px solid var(--border2); }
+
+/* ── 기능 설명 박스들 ── */
+.feat-box { background: var(--bg3); border: 1px solid var(--border2); border-radius: 6px; padding: 12px 14px; margin: 10px 15px; }
+.feat-box-title { font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+.feat-rows { display: flex; flex-direction: column; gap: 6px; }
+.feat-row { display: grid; grid-template-columns: 150px 1fr; gap: 10px; font-size: 11px; }
+.feat-key { font-family: var(--mono); font-size: 10px; font-weight: 600; padding-top: 1px; }
+.feat-val { color: var(--text2); line-height: 1.6; }
+.feat-val b { color: var(--text); font-weight: 600; }
+
+.sync-box { background: var(--bg3); border: 1px solid var(--cyan-b); border-radius: 6px; padding: 11px 14px; margin: 10px 15px; }
+.sync-title { font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 0.1em; color: var(--cyan); text-transform: uppercase; margin-bottom: 8px; }
+.sync-flow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.sync-node { font-family: var(--mono); font-size: 10px; font-weight: 600; padding: 3px 9px; border-radius: 4px; }
+.sn-date { background: var(--cyan-bg);   color: var(--cyan); }
+.sn-api  { background: var(--blue-bg);   color: var(--blue); }
+.sn-new  { background: var(--green-bg);  color: var(--green); }
+.sn-mod  { background: var(--amber-bg);  color: var(--amber); }
+.sn-skip { background: var(--bg4);       color: var(--text3); border: 1px solid var(--border2); }
+.sync-arr { color: var(--text3); font-size: 12px; }
+
+.merge-box { background: var(--bg3); border: 1px solid var(--purple-b); border-radius: 6px; padding: 11px 14px; margin: 10px 15px; }
+.merge-title { font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 0.1em; color: var(--purple); text-transform: uppercase; margin-bottom: 8px; }
+.merge-steps { display: flex; flex-direction: column; gap: 5px; }
+.merge-step { display: grid; grid-template-columns: 20px 1fr; gap: 8px; font-size: 11px; }
+.ms-num { font-family: var(--mono); font-size: 10px; font-weight: 700; color: var(--purple); padding-top: 1px; }
+.ms-desc { color: var(--text2); line-height: 1.6; }
+.ms-desc b { color: var(--text); }
+
+.trans-box { background: var(--bg3); border: 1px solid var(--pink-b); border-radius: 6px; padding: 11px 14px; margin: 10px 15px; }
+.trans-title { font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 0.1em; color: var(--pink); text-transform: uppercase; margin-bottom: 8px; }
+.trans-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.trans-item { background: var(--bg4); border: 1px solid var(--border); border-radius: 5px; padding: 8px 10px; }
+.trans-item-title { font-family: var(--mono); font-size: 9px; font-weight: 700; color: var(--pink); margin-bottom: 4px; }
+.trans-item-desc { font-size: 10.5px; color: var(--text2); line-height: 1.6; }
+.trans-item-desc b { color: var(--text); }
+
+.ai-box { background: var(--bg3); border: 1px solid var(--amber-b); border-radius: 6px; padding: 11px 14px; margin: 10px 15px; }
+.ai-title { font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 0.1em; color: var(--amber); text-transform: uppercase; margin-bottom: 8px; }
+.ai-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 7px; }
+.ai-item { background: var(--bg4); border: 1px solid var(--border); border-radius: 5px; padding: 8px 10px; }
+.ai-item-title { font-family: var(--mono); font-size: 9px; font-weight: 700; color: var(--amber); margin-bottom: 3px; }
+.ai-item-desc { font-size: 10.5px; color: var(--text2); line-height: 1.6; }
+
+.map-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 15px; }
+.map-item { background: var(--bg4); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.map-item-title { padding: 7px 11px; font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 0.08em; border-bottom: 1px solid var(--border); background: var(--bg3); }
+.map-item-body { padding: 9px 11px; font-family: var(--mono); font-size: 10px; line-height: 1.75; color: var(--text2); }
+.ck { color: var(--pink); } .cv { color: var(--green); } .cc { color: var(--text3); }
+
+.ext-note { background: var(--bg3); border: 1px solid var(--border2); border-radius: 5px; padding: 9px 12px; margin: 10px 15px; font-size: 11px; color: var(--text2); line-height: 1.65; }
+.ext-note b { color: var(--text); }
+.n-new  { color: var(--green);  font-weight: 700; font-family: var(--mono); font-size: 10px; }
+.n-same { color: var(--text3); font-family: var(--mono); font-size: 10px; }
+</style>
+</head>
+<body>
+
+<div class="hd-badge">K-CULTURE PLATFORM · ROADMAP v9</div>
+<h1>메인 파이프라인 + 확장 가능 구조</h1>
+<p class="hd-sub">Stage → Core → Service 구조 유지 · 소스별 어댑터로 무한 확장</p>
+
+<div class="hd-cards">
+  <div class="hd-card">
+    <div class="hd-card-label">DB 구조</div>
+    <div class="hd-card-val"><span style="color:var(--blue)">stage</span> 원천 적재<br><span style="color:var(--purple)">core</span> 정제·병합<br><span style="color:var(--green)">service</span> 서비스 노출</div>
+  </div>
+  <div class="hd-card">
+    <div class="hd-card-label">카테고리 전략</div>
+    <div class="hd-card-val">source_category 원천 저장<br><span style="color:var(--amber)">domain_map.json</span> 으로<br>display_domain 자동 매핑</div>
+  </div>
+  <div class="hd-card">
+    <div class="hd-card-label">확장 단위</div>
+    <div class="hd-card-val">새 소스 = <span style="color:var(--green)">수집기 1개</span><br>+ JSON 키 추가만<br>파이프라인 코드 무변경</div>
+  </div>
+</div>
+
+<div class="sec">전체 파이프라인 — 모든 소스 공통</div>
+
+<div class="pipe-banner">
+  <div class="pipe-banner-title">Stage → Core → Service 데이터 흐름</div>
+  <div class="pipe-nodes">
+    <div class="pipe-node pn-collect">
+      <div class="pipe-node-num" style="color:var(--blue)">① 수집</div>
+      <div class="pipe-node-name">Collect</div>
+      <div class="pipe-node-desc">CSV + 업종코드<br>+ 지역코드<br>→ stage 적재</div>
+      <div class="pipe-arrow">›</div>
+    </div>
+    <div class="pipe-node pn-sync">
+      <div class="pipe-node-num" style="color:var(--cyan)">② sync 판단</div>
+      <div class="pipe-node-name">Sync Check</div>
+      <div class="pipe-node-desc">신규·변경 감지<br>소스별 API<br>→ pending 등록</div>
+      <div class="pipe-arrow">›</div>
+    </div>
+    <div class="pipe-node pn-merge">
+      <div class="pipe-node-num" style="color:var(--purple)">③ 정규화·병합</div>
+      <div class="pipe-node-name">Normalize · Merge</div>
+      <div class="pipe-node-desc">중복 제거<br>소스 우선순위<br>→ core 적재</div>
+      <div class="pipe-arrow">›</div>
+    </div>
+    <div class="pipe-node pn-trans">
+      <div class="pipe-node-num" style="color:var(--pink)">④ 번역</div>
+      <div class="pipe-node-name">Translate</div>
+      <div class="pipe-node-desc">Batch API<br>10개 언어<br>신규·변경분만</div>
+      <div class="pipe-arrow">›</div>
+    </div>
+    <div class="pipe-node pn-service">
+      <div class="pipe-node-num" style="color:var(--green)">⑤ 서비스</div>
+      <div class="pipe-node-name">Service API</div>
+      <div class="pipe-node-desc">REST API<br>display_domain<br>필터·검색</div>
+      <div class="pipe-arrow">›</div>
+    </div>
+    <div class="pipe-node pn-ai">
+      <div class="pipe-node-num" style="color:var(--amber)">⑥ AI챗봇</div>
+      <div class="pipe-node-name">AI Chatbot</div>
+      <div class="pipe-node-desc">GPT-4.1<br>pgvector 검색<br>일정 추천</div>
+    </div>
+  </div>
+</div>
+
+<div class="timeline">
+  <div class="tl-header">전체 진행 순서</div>
+  <div class="tl-row">
+    <div class="tl-phase"><div class="tl-phase-name" style="color:var(--blue)">Phase 0</div><div class="tl-phase-est">1~2일</div></div>
+    <div class="tl-src" style="color:var(--text2)">환경 준비</div>
+    <div class="tl-steps-list">
+      <span class="tl-badge on">DB 스키마</span><span class="tl-arr">›</span>
+      <span class="tl-badge on">domain_map.json</span><span class="tl-arr">›</span>
+      <span class="tl-badge on">region_map.json</span><span class="tl-arr">›</span>
+      <span class="tl-badge on">프로젝트 구조</span>
+    </div>
+  </div>
+  <div class="tl-row">
+    <div class="tl-phase"><div class="tl-phase-name" style="color:var(--blue)">Phase 1</div><div class="tl-phase-est">4~6주</div></div>
+    <div class="tl-src" style="color:var(--blue)">관광공사</div>
+    <div class="tl-steps-list">
+      <span class="tl-badge on">CSV 수집</span><span class="tl-arr">›</span>
+      <span class="tl-badge on">맵 설계</span><span class="tl-arr">›</span>
+      <span class="tl-badge on">sync 판단</span><span class="tl-arr">›</span>
+      <span class="tl-badge on">정규화</span><span class="tl-arr">›</span>
+      <span class="tl-badge on">번역</span><span class="tl-arr">›</span>
+      <span class="tl-badge on">서비스 API</span><span class="tl-arr">›</span>
+      <span class="tl-badge on">AI챗봇</span>
+    </div>
+  </div>
+  <div class="tl-row">
+    <div class="tl-phase"><div class="tl-phase-name" style="color:var(--green)">Phase 2</div><div class="tl-phase-est">+1~2주</div></div>
+    <div class="tl-src" style="color:var(--green)">행안부</div>
+    <div class="tl-steps-list">
+      <span class="tl-badge on">CSV 수집</span><span class="tl-arr">›</span>
+      <span class="tl-badge on">맵 추가</span><span class="tl-arr">›</span>
+      <span class="tl-badge on">sync 판단</span><span class="tl-arr">›</span>
+      <span class="tl-badge on">merge</span><span class="tl-arr">›</span>
+      <span class="tl-badge on">번역</span><span class="tl-arr">›</span>
+      <span class="tl-badge reuse">서비스·AI 공통 재사용</span>
+    </div>
+  </div>
+  <div class="tl-row">
+    <div class="tl-phase"><div class="tl-phase-name" style="color:var(--pink)">Phase 3</div><div class="tl-phase-est">+1~2주</div></div>
+    <div class="tl-src" style="color:var(--pink)">문체부</div>
+    <div class="tl-steps-list">
+      <span class="tl-badge on">CSV+API 수집</span><span class="tl-arr">›</span>
+      <span class="tl-badge on">맵 추가</span><span class="tl-arr">›</span>
+      <span class="tl-badge on">sync 판단</span><span class="tl-arr">›</span>
+      <span class="tl-badge on">merge</span><span class="tl-arr">›</span>
+      <span class="tl-badge on">번역</span><span class="tl-arr">›</span>
+      <span class="tl-badge reuse">공통 재사용</span>
+    </div>
+  </div>
+  <div class="tl-row">
+    <div class="tl-phase"><div class="tl-phase-name" style="color:var(--amber)">Phase 4+</div><div class="tl-phase-est">소스별</div></div>
+    <div class="tl-src" style="color:var(--amber)">크롤링…</div>
+    <div class="tl-steps-list">
+      <span class="tl-badge on">수집기 추가</span><span class="tl-arr">›</span>
+      <span class="tl-badge on">맵 추가</span><span class="tl-arr">›</span>
+      <span class="tl-badge reuse">이하 공통 파이프라인</span>
+    </div>
+  </div>
+</div>
+
+
+<div class="sec">Phase 0 — 환경 준비 + 스키마 설계</div>
+
+<div class="source-block src-tour">
+  <div class="sb-header">
+    <span class="sb-badge sb-tour">Phase 0</span>
+    <span class="sb-title">확장 가능 스키마 + 맵 초기 설계</span>
+    <span class="sb-note">1~2일</span>
+  </div>
+  <div class="steps">
+    <div class="step">
+      <div class="sn">0-1</div>
+      <div class="st">개발 환경 + 프로젝트 구조</div>
+      <div class="si">PostgreSQL 15+ · PostGIS
+Python 3.11+ · psycopg2 · pandas
+pyproj · OpenAI SDK · APScheduler
+
+adapters/{tourapi,mois,mcst,crawl}/
+pipeline/{sync,normalizer,dedup,
+          translator,scheduler}/
+config/domain_map.json
+config/region_map.json</div>
+      <div class="tags"><span class="tag t-ddl">설치</span><span class="tag t-code">세팅</span></div>
+    </div>
+    <div class="step">
+      <div class="sn">0-2</div>
+      <div class="st">Stage 스키마 DDL</div>
+      <div class="si"><b>stage.raw_documents</b>
+  source_name  'tourapi'|'mois'|'mcst'|'crawl'
+  source_id    원천 ID 원본
+  raw_data     JSONB (원천 데이터 전체)
+  sync_status  'new'|'modified'|'deleted'
+  collected_at
+
+<b>stage.sync_runs</b>   수집 이력
+<b>stage.api_sources</b> 소스 등록
+<b>stage.source_sync_state</b> 마지막 sync 시각</div>
+      <div class="tags"><span class="tag t-ddl">DDL</span></div>
+    </div>
+    <div class="step">
+      <div class="sn">0-3</div>
+      <div class="st">Core 스키마 DDL</div>
+      <div class="si"><b>core.places</b>
+  place_id · name · address · coords
+  source_name · source_id
+  source_category   원천 카테고리 (null 허용)
+  display_domain    'kfood'|'kbeauty'|null
+  region_code       원천 지역코드
+  display_region    '서울'|'부산'|null
+  is_active · quality_score
+
+<b>core.place_source_ids</b>  멀티소스 ID
+<b>core.place_translations</b>  10개 언어
+<b>core.place_images</b>  Cloudinary
+<b>core.translation_fill_queue</b></div>
+      <div class="tags"><span class="tag t-ddl">DDL</span></div>
+    </div>
+    <div class="step">
+      <div class="sn">0-4</div>
+      <div class="st">Service 스키마 DDL</div>
+      <div class="si"><b>service.places_snapshot</b>
+  places + translations 조인 뷰
+  번역 완료 시 trigger 자동 갱신
+  서비스 응답 전용 (JOIN 없이 단건 조회)
+
+<b>service.search_index</b>  pgvector 임베딩
+<b>user.users · bookmarks · reviews</b>
+<b>ai.itineraries · chat_sessions</b></div>
+      <div class="tags"><span class="tag t-ddl">DDL</span></div>
+    </div>
+  </div>
+
+  <div class="map-grid">
+    <div class="map-item">
+      <div class="map-item-title" style="color:var(--amber)">config/domain_map.json</div>
+      <div class="map-item-body"><span class="ck">"kfood"</span>: {
+  <span class="ck">"tourapi"</span>: [<span class="cv">"39"</span>],
+  <span class="ck">"mois"</span>: [<span class="cv">"일반음식점"</span>, <span class="cv">"휴게음식점"</span>, <span class="cv">"제과점영업"</span>],
+  <span class="ck">"mcst"</span>: [<span class="cv">"식음료"</span>]
+},
+<span class="ck">"kbeauty"</span>: {
+  <span class="ck">"mois"</span>: [<span class="cv">"미용업"</span>, <span class="cv">"네일숍"</span>]
+},
+<span class="ck">"ktourism"</span>: {
+  <span class="ck">"tourapi"</span>: [<span class="cv">"12"</span>, <span class="cv">"14"</span>, <span class="cv">"25"</span>]
+},
+<span class="ck">"koptical"</span>: {
+  <span class="ck">"mois"</span>: [<span class="cv">"안경업"</span>]
+} <span class="cc">← 새 도메인 = 블록 추가만</span></div>
+    </div>
+    <div class="map-item">
+      <div class="map-item-title" style="color:var(--cyan)">config/region_map.json</div>
+      <div class="map-item-body"><span class="ck">"1"</span>: {
+  <span class="ck">"ko"</span>: <span class="cv">"서울"</span>, <span class="ck">"en"</span>: <span class="cv">"Seoul"</span>,
+  <span class="ck">"ja"</span>: <span class="cv">"ソウル"</span>, <span class="ck">"zh-CN"</span>: <span class="cv">"首尔"</span>,
+  <span class="ck">"mois_code"</span>: <span class="cv">"서울특별시"</span>
+},
+<span class="ck">"6"</span>: {
+  <span class="ck">"ko"</span>: <span class="cv">"부산"</span>, <span class="ck">"en"</span>: <span class="cv">"Busan"</span>,
+  <span class="ck">"ja"</span>: <span class="cv">"釜山"</span>, <span class="ck">"zh-CN"</span>: <span class="cv">"釜山"</span>,
+  <span class="ck">"mois_code"</span>: <span class="cv">"부산광역시"</span>
+} <span class="cc">← 소스별 지역코드 통합 관리</span></div>
+    </div>
+  </div>
+</div>
+
+
+<div class="sec">Phase 1 — 한국관광공사 (코어 파이프라인 완성)</div>
+
+<div class="source-block src-tour">
+  <div class="sb-header">
+    <span class="sb-badge sb-tour">Phase 1</span>
+    <span class="sb-title">관광공사 — 수집 → sync → 정규화 → 번역 → 서비스 → AI챗봇 전체 완성</span>
+    <span class="sb-note">4~6주</span>
+  </div>
+
+  <div class="steps">
+    <div class="step full">
+      <div class="sn">1-1</div>
+      <div class="st"><span style="color:var(--blue)">①</span> 데이터 수집 — CSV 3종</div>
+      <div class="si">adapters/tourapi/collector.py
+<b>관광정보 CSV</b>  → stage.raw_documents (source_name='tourapi')
+<b>업종코드 CSV</b>  → domain_map.json "tourapi" 키 매핑 기준 확정
+<b>지역코드 CSV</b>  → region_map.json "tourapi" areaCode 매핑 기준 확정
+
+source_category = contentTypeId 원천값 그대로 저장 (없으면 null)
+region_code     = areaCode 원천값 그대로 저장
+→ domain_mapper.py 실행 → display_domain 자동 매핑
+→ region_mapper.py 실행 → display_region 자동 매핑</div>
+      <div class="tags"><span class="tag t-csv">CSV</span><span class="tag t-code">코드</span><span class="tag t-once">초기 1회</span></div>
+    </div>
+  </div>
+
+  <div class="feat-box">
+    <div class="feat-box-title" style="color:var(--blue)">핵심 기능 — CsvSchemaInspector</div>
+    <div class="feat-rows">
+      <div class="feat-row">
+        <div class="feat-key" style="color:var(--blue)">자동 헤더 파싱</div>
+        <div class="feat-val">CSV 1~2행만 읽어 컬럼명·타입·ID형식·좌표컬럼 자동 감지 → <b>schema_report.json</b> 생성 · 모든 소스 수집 전 1회 실행</div>
+      </div>
+      <div class="feat-row">
+        <div class="feat-key" style="color:var(--blue)">ID 형식 분류</div>
+        <div class="feat-val">numeric / alpha_numeric / prefixed / uuid 자동 분류 → <b>place_source_ids.id_format</b> 기록</div>
+      </div>
+      <div class="feat-row">
+        <div class="feat-key" style="color:var(--blue)">좌표계 감지</div>
+        <div class="feat-val">WGS84 기본 제공 확인 / EPSG:5174 감지 시 <b>pyproj 자동 변환</b> 로직 사전 설계 (행안부 대비)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step full">
+      <div class="sn">1-2</div>
+      <div class="st"><span style="color:var(--cyan)">②</span> sync 판단 — areaBasedSyncList2</div>
+      <div class="si">adapters/tourapi/sync_checker.py</div>
+      <div class="tags"><span class="tag t-sync">SYNC</span><span class="tag t-api">API</span><span class="tag t-auto">자동</span></div>
+    </div>
+  </div>
+
+  <div class="sync-box">
+    <div class="sync-title">관광공사 Sync 흐름 — areaBasedSyncList2</div>
+    <div class="sync-flow">
+      <div class="sync-node sn-date">현재 날짜 기준</div>
+      <div class="sync-arr">→</div>
+      <div class="sync-node sn-api">areaBasedSyncList2 호출</div>
+      <div class="sync-arr">→</div>
+      <div class="sync-node sn-new">createdtime 신규 → INSERT</div>
+      <div class="sync-arr">+</div>
+      <div class="sync-node sn-mod">modifiedtime 변경 → UPDATE</div>
+      <div class="sync-arr">+</div>
+      <div class="sync-node sn-skip">변경없음 → SKIP</div>
+    </div>
+  </div>
+
+  <div class="feat-box">
+    <div class="feat-box-title" style="color:var(--cyan)">핵심 기능 — Sync 판단 로직 (공통 구조)</div>
+    <div class="feat-rows">
+      <div class="feat-row">
+        <div class="feat-key" style="color:var(--cyan)">최초 수집</div>
+        <div class="feat-val">전체 데이터 bulk 수집 → stage.raw_documents INSERT · <b>sync_status = 'new'</b> · sync_runs 이력 기록</div>
+      </div>
+      <div class="feat-row">
+        <div class="feat-key" style="color:var(--cyan)">이후 수집</div>
+        <div class="feat-val">source_sync_state의 <b>last_synced_at</b> 이후 변경분만 → 신규 INSERT / 변경 UPDATE / 삭제 is_active=false</div>
+      </div>
+      <div class="feat-row">
+        <div class="feat-key" style="color:var(--cyan)">스케줄러</div>
+        <div class="feat-val">APScheduler cron 등록 → <b>주간 자동 실행</b> · 실패 시 재시도 · sync_runs 이력 누적</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step">
+      <div class="sn">1-3</div>
+      <div class="st"><span style="color:var(--purple)">③</span> 정규화 (Normalizer)</div>
+      <div class="si">pipeline/normalizer/base.py
+표준 포맷 변환
+  name · address · coords
+  phone · description
+WGS84 좌표 검증
+quality_score 산정
+  (좌표·상호명·주소 completeness)
+→ core.places upsert</div>
+      <div class="tags"><span class="tag t-code">코드</span></div>
+    </div>
+    <div class="step">
+      <div class="sn">1-4</div>
+      <div class="st"><span style="color:var(--purple)">③</span> 도메인·지역 매핑 적용</div>
+      <div class="si">pipeline/domain_mapper.py
+domain_map.json 로드
+source_name + source_category
+→ display_domain 업데이트
+
+pipeline/region_mapper.py
+region_map.json 로드
+source_name + region_code
+→ display_region 업데이트
+<span style="color:var(--green)">→ 파이프라인 코드 변경 없음</span></div>
+      <div class="tags"><span class="tag t-json">JSON</span><span class="tag t-code">코드</span></div>
+    </div>
+    <div class="step">
+      <div class="sn">1-5</div>
+      <div class="st">Cloudinary 이미지 파이프라인</div>
+      <div class="si">TourAPI 이미지 URL → image_queue
+원본 URL 만료 전 즉시 업로드
+public_id 중복 체크 → skip
+실패 → image_error_queue (최대 3회 재시도)
+썸네일 400×300 crop · WebP 변환
+→ core.place_images upsert</div>
+      <div class="tags"><span class="tag t-img">Cloudinary</span><span class="tag t-code">코드</span></div>
+    </div>
+    <div class="step">
+      <div class="sn">1-6</div>
+      <div class="st">번역 큐 자동 등록</div>
+      <div class="si">신규 place
+  → translation_fill_queue 5개 언어 (테스트 후 5개 추가)
+  → triggered_by='new' · is_retranslation=false
+변경 place
+  → triggered_by='update'
+  → is_retranslation=true
+ON CONFLICT DO NOTHING (멱등성 보장)</div>
+      <div class="tags"><span class="tag t-code">코드</span><span class="tag t-auto">자동</span></div>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step full">
+      <div class="sn">1-7</div>
+      <div class="st"><span style="color:var(--pink)">④</span> 번역 — AI Batch 파이프라인</div>
+      <div class="si">pipeline/translator/batch_translator.py</div>
+      <div class="tags"><span class="tag t-ai">GPT-4.1 mini</span><span class="tag t-code">코드</span></div>
+    </div>
+  </div>
+
+  <div class="trans-box">
+    <div class="trans-title">핵심 기능 — AI 번역 Batch 파이프라인 (공통)</div>
+    <div class="trans-grid">
+      <div class="trans-item">
+        <div class="trans-item-title">① JSONL 생성</div>
+        <div class="trans-item-desc">translation_fill_queue (status=pending) 전량<br>custom_id = <b>"{type}_{id}_{lang}"</b><br>K-culture 맥락 프롬프트 적용<br>파일당 <b>40,000건</b> / 초과 시 자동 분할</div>
+      </div>
+      <div class="trans-item">
+        <div class="trans-item-title">② Batch 제출</div>
+        <div class="trans-item-desc">OpenAI Files API 업로드<br><b>Batch Job 생성</b> (24h window)<br>GPT-4.1 mini → <b>비용 50% 절감</b><br>job_id → sync_runs 기록</div>
+      </div>
+      <div class="trans-item">
+        <div class="trans-item-title">③ 결과 수거 (cron 폴링)</div>
+        <div class="trans-item-desc">status=completed 감지<br>output JSONL 다운로드<br>custom_id 파싱 → <b>place_translations upsert</b><br>error → status=error · 재처리 스크립트</div>
+      </div>
+      <div class="trans-item">
+        <div class="trans-item-title">④ 스냅샷 자동 갱신</div>
+        <div class="trans-item-desc">번역 완료 trigger<br>→ <b>service.places_snapshot</b> 자동 갱신<br>en 완료 → is_publishable=true<br>Fallback: 누락 → en → ko 순</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step">
+      <div class="sn">1-8</div>
+      <div class="st"><span style="color:var(--green)">⑤</span> 서비스 API</div>
+      <div class="si">FastAPI / REST
+GET /places          목록·필터·페이징
+GET /places/{id}     상세
+GET /places/search   키워드·좌표 검색
+
+<b>필터 파라미터</b>
+  display_domain  kfood·kbeauty·ktourism
+  display_region  서울·부산·제주
+  lang            10개 언어
+
+service.places_snapshot 단건 조회
+  (JOIN 없이 응답 최적화)</div>
+      <div class="tags"><span class="tag t-api">API</span><span class="tag t-code">코드</span></div>
+    </div>
+    <div class="step">
+      <div class="sn">1-9</div>
+      <div class="st">User API · 프론트엔드</div>
+      <div class="si">JWT · OAuth 인증
+북마크 추가·삭제·목록
+리뷰 작성·조회
+
+Next.js 프론트엔드
+  display_domain 카테고리 필터
+  display_region 지역 필터
+  다국어 UI (i18n 10개 언어)
+  Cloudinary 이미지 렌더링
+Vercel 배포 · CI/CD</div>
+      <div class="tags"><span class="tag t-code">코드</span></div>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step full">
+      <div class="sn">1-10</div>
+      <div class="st"><span style="color:var(--amber)">⑥</span> AI 챗봇 (GPT-4.1)</div>
+      <div class="si">pipeline/chatbot/ 작성</div>
+      <div class="tags"><span class="tag t-ai">GPT-4.1</span><span class="tag t-code">코드</span></div>
+    </div>
+  </div>
+
+  <div class="ai-box">
+    <div class="ai-title">핵심 기능 — AI 챗봇</div>
+    <div class="ai-grid">
+      <div class="ai-item">
+        <div class="ai-item-title">pgvector 의미 검색</div>
+        <div class="ai-item-desc">name + description 임베딩<br>"BTS 관련 장소" 자연어 검색<br>source_category 전체 대상<br>(display_domain null 포함)</div>
+      </div>
+      <div class="ai-item">
+        <div class="ai-item-title">멀티턴 대화</div>
+        <div class="ai-item-desc">GPT-4.1 Function Calling<br>chat_sessions · chat_messages<br>대화 컨텍스트 기반 추천<br>실시간 일정 수정</div>
+      </div>
+      <div class="ai-item">
+        <div class="ai-item-title">일정 추천</div>
+        <div class="ai-item-desc">itineraries · itinerary_items<br>거리 기반 동선 최적화<br>혼잡도·이동시간 고려<br>→ 새 소스 추가 시 자동 확장</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step full">
+      <div class="sn">1-11</div>
+      <div class="st">✅ Phase 1 완성 기준</div>
+      <div class="si">관광공사 5만건 서비스 중 · display_domain·display_region 필터 정상 동작 · 10개 언어 번역 완료 · AI챗봇 자연어 검색 동작 · sync 스케줄러 주간 자동 실행 · <span style="color:var(--green)">→ 코어 파이프라인 표준 템플릿 완성 · Phase 2 이후는 어댑터 추가만</span></div>
+      <div class="tags"><span class="tag t-test">마일스톤</span></div>
+    </div>
+  </div>
+</div>
+
+
+<div class="sec">Phase 2 — 행정안전부 (어댑터 이식)</div>
+
+<div class="source-block src-mois">
+  <div class="sb-header">
+    <span class="sb-badge sb-mois">Phase 2</span>
+    <span class="sb-title">행정안전부 — 수집 · 맵 추가 · sync · merge · 번역</span>
+    <span class="sb-note">+1~2주</span>
+  </div>
+
+  <div class="ext-note">
+    <span class="n-new">NEW</span> &nbsp;수집기 + 맵 추가 + sync 방식 구현 + Dedup merge &nbsp;&nbsp;
+    <span class="n-same">SAME</span> &nbsp;정규화·번역·서비스·AI챗봇 — Phase 1 공통 파이프라인 그대로 재사용
+  </div>
+
+  <div class="steps">
+    <div class="step full">
+      <div class="sn">2-1</div>
+      <div class="st"><span style="color:var(--blue)">①</span> 데이터 수집 — CSV 3종 <span class="tag t-new">NEW</span></div>
+      <div class="si">adapters/mois/collector.py 작성
+<b>인허가 데이터 CSV</b>  → stage.raw_documents (source_name='mois')
+<b>업종코드 CSV</b>       → domain_map.json "mois" 키 추가
+<b>지역코드 CSV</b>       → region_map.json "mois_code" 매핑 추가
+
+source_category = 업종코드 원천값 저장
+<span style="color:var(--red)">⚠ 좌표계: EPSG:5174 → WGS84(4326) pyproj 변환</span>
+<span style="color:var(--red)">⚠ 영업상태코드 필터: '영업' 상태만 적재 (폐업·휴업 제외)</span></div>
+      <div class="tags"><span class="tag t-csv">CSV</span><span class="tag t-code">코드</span><span class="tag t-once">초기 1회</span><span class="tag t-new">NEW</span></div>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step">
+      <div class="sn">2-2</div>
+      <div class="st"><span style="color:var(--amber)">②</span> 카테고리·지역맵 추가 <span class="tag t-new">NEW</span></div>
+      <div class="si">domain_map.json "mois" 키 추가
+  일반음식점·휴게음식점·제과점영업 → kfood
+  미용업·네일숍·피부미용업 → kbeauty
+  안경업 → koptical
+  (업종코드 CSV 기반 확정)
+
+region_map.json "mois_code" 매핑 추가
+  "서울특별시" → region_code "1"
+<span style="color:var(--green)">→ 파이프라인 코드 변경 없음</span></div>
+      <div class="tags"><span class="tag t-json">JSON</span><span class="tag t-new">NEW</span></div>
+    </div>
+    <div class="step">
+      <div class="sn">2-3</div>
+      <div class="st"><span style="color:var(--cyan)">③</span> sync 판단 — history API <span class="tag t-new">NEW</span></div>
+      <div class="si">adapters/mois/sync_checker.py 작성
+BASE_DATE 기준 변경 이력 조회
+
+<b>API 예시 (병원)</b>
+apis.data.go.kr/1741000/hospitals/history
+  ?cond[BASE_DATE::EQ]=20260101
+  &cond[OPN_ATMY_GRP_CD::EQ]=30000000
+
+업종별 OPN_ATMY_GRP_CD 코드 관리
+→ sync_status 'new'|'modified' 기록
+→ stage 적재 후 공통 파이프라인 통과</div>
+      <div class="tags"><span class="tag t-sync">SYNC</span><span class="tag t-api">API</span><span class="tag t-new">NEW</span></div>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step full">
+      <div class="sn">2-4</div>
+      <div class="st"><span style="color:var(--purple)">④</span> 기존 데이터와 Merge — 중복 제거 <span class="tag t-new">NEW (2번째 소스부터)</span></div>
+      <div class="si">pipeline/dedup/ensemble.py (Phase 1에서 완성된 로직 재사용)</div>
+      <div class="tags"><span class="tag t-merge">Merge</span><span class="tag t-code">코드</span></div>
+    </div>
+  </div>
+
+  <div class="merge-box">
+    <div class="merge-title">핵심 기능 — Dedup 3단계 앙상블 (공통 파이프라인)</div>
+    <div class="merge-steps">
+      <div class="merge-step">
+        <div class="ms-num">0</div>
+        <div class="ms-desc">좌표 null → 중복 검사 skip · <b>신규 INSERT</b> (좌표 없으면 공간 비교 불가)</div>
+      </div>
+      <div class="merge-step">
+        <div class="ms-num">1</div>
+        <div class="ms-desc"><b>PostGIS 공간 필터</b> — 반경 50m 이내 후보 추출 (좌표 변환 오차 감안)</div>
+      </div>
+      <div class="merge-step">
+        <div class="ms-num">2</div>
+        <div class="ms-desc"><b>상호명 가중 앙상블</b> (임계값 0.82) — Jaro-Winkler 0.4 + Token Sort Ratio 0.35 + 자모분리 Levenshtein 0.25</div>
+      </div>
+      <div class="merge-step">
+        <div class="ms-num">3</div>
+        <div class="ms-desc"><b>소스 우선순위 병합</b> — 관광공사 원본 우선 · 행안부 보완 필드 merge · place_source_ids에 두 source_id 연결<br>0.82미만 → 신규 &nbsp;/&nbsp; 0.82~0.92 → 검토큐 &nbsp;/&nbsp; 0.92+ → 자동병합</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step full">
+      <div class="sn">2-5</div>
+      <div class="st"><span style="color:var(--pink)">⑤</span> 번역 — 신규·변경분만 <span class="tag t-reuse">공통 재사용</span></div>
+      <div class="si">translation_fill_queue에 신규·변경 place만 pending 등록
+→ Batch 번역 파이프라인 그대로 실행 (Phase 1 완성 로직)
+→ service.places_snapshot trigger 자동 갱신
+→ AI챗봇 검색 범위 자동 확장 (코드 변경 없음)</div>
+      <div class="tags"><span class="tag t-ai">GPT-4.1 mini</span><span class="tag t-auto">자동</span><span class="tag t-reuse">공통</span></div>
+    </div>
+  </div>
+</div>
+
+
+<div class="sec">Phase 3 — 문화체육관광부 (어댑터 이식)</div>
+
+<div class="source-block src-mcst">
+  <div class="sb-header">
+    <span class="sb-badge sb-mcst">Phase 3</span>
+    <span class="sb-title">문화체육관광부 — CSV + 실시간 API (축제·행사)</span>
+    <span class="sb-note">+1~2주</span>
+  </div>
+
+  <div class="ext-note">
+    <span class="n-new">NEW</span> &nbsp;수집기 + 맵 추가 + 실시간 이벤트 스케줄러 &nbsp;&nbsp;
+    <span class="n-same">SAME</span> &nbsp;Dedup·번역·서비스·AI챗봇 공통 재사용
+  </div>
+
+  <div class="steps">
+    <div class="step">
+      <div class="sn">3-1</div>
+      <div class="st"><span style="color:var(--blue)">①</span> 데이터 수집 <span class="tag t-new">NEW</span></div>
+      <div class="si">adapters/mcst/collector.py 작성
+<b>정적 CSV</b>
+  박물관 · 문화유산 → stage 적재
+  업종코드 · 지역코드 CSV
+
+<b>실시간 API</b>
+  축제·행사 · 공연 → 일간 폴링
+  source_name = 'mcst'</div>
+      <div class="tags"><span class="tag t-csv">CSV</span><span class="tag t-api">API</span><span class="tag t-new">NEW</span></div>
+    </div>
+    <div class="step">
+      <div class="sn">3-2</div>
+      <div class="st"><span style="color:var(--amber)">②</span> 맵 추가 <span class="tag t-new">NEW</span></div>
+      <div class="si">domain_map.json "mcst" 키 추가
+  박물관·미술관 → ktourism
+  식음료 → kfood
+  공연시설 → kpop
+
+region_map.json mcst 지역코드 추가
+
+<b>이벤트 만료 처리 (cron 매일)</b>
+  endDate &lt; now() → is_active=false
+  → events_archive 30일 보존 후 삭제</div>
+      <div class="tags"><span class="tag t-json">JSON</span><span class="tag t-auto">cron</span><span class="tag t-new">NEW</span></div>
+    </div>
+    <div class="step">
+      <div class="sn">3-3</div>
+      <div class="st"><span style="color:var(--cyan)">③</span> sync 판단 <span class="tag t-new">NEW</span></div>
+      <div class="si">adapters/mcst/sync_checker.py
+정적 데이터: 월간 CSV 교체 감지
+실시간 이벤트: 일간 API 폴링
+  신규 행사 → sync_status='new'
+  변경 행사 → sync_status='modified'
+  만료 행사 → is_active=false
+→ 공통 파이프라인 통과</div>
+      <div class="tags"><span class="tag t-sync">SYNC</span><span class="tag t-auto">자동</span><span class="tag t-new">NEW</span></div>
+    </div>
+    <div class="step">
+      <div class="sn">3-4</div>
+      <div class="st">④⑤ Merge · 번역 <span class="tag t-reuse">공통 재사용</span></div>
+      <div class="si">Dedup 앙상블 → core merge
+번역 큐 → Batch API 자동 처리
+places_snapshot 자동 갱신
+AI챗봇 검색 범위 자동 확장</div>
+      <div class="tags"><span class="tag t-merge">Merge</span><span class="tag t-ai">번역</span><span class="tag t-reuse">공통</span></div>
+    </div>
+  </div>
+</div>
+
+
+<div class="sec">Phase 4+ — 크롤링 · 추가 소스 (동일 패턴 반복)</div>
+
+<div class="source-block src-crawl">
+  <div class="sb-header">
+    <span class="sb-badge sb-crawl">Phase 4+</span>
+    <span class="sb-title">크롤링 · AI서치 · 추가 소스 — 수집기 1개 추가로 확장</span>
+    <span class="sb-note">소스별 1~2주</span>
+  </div>
+
+  <div class="ext-note">
+    <b>새 소스 추가 = 딱 2가지</b><br>
+    <span class="n-new">①</span> adapters/{source}/collector.py + sync_checker.py 작성 (sync 방식은 소스별 자유 구현)<br>
+    <span class="n-new">②</span> domain_map.json + region_map.json에 해당 소스 키 추가<br>
+    <span class="n-same">→ 정규화 · Dedup · 번역 · 서비스 · AI챗봇 — 모두 공통 파이프라인 그대로</span>
+  </div>
+
+  <div class="steps">
+    <div class="step">
+      <div class="sn">4-1</div>
+      <div class="st">크롤러 수집기</div>
+      <div class="si">adapters/crawl/collector.py
+source_name = 'crawl'
+source_category = null 허용
+  → display_domain = null
+  → 프론트 필터 미노출
+  → AI챗봇 검색 대상은 포함</div>
+      <div class="tags"><span class="tag t-code">코드</span><span class="tag t-new">NEW</span></div>
+    </div>
+    <div class="step">
+      <div class="sn">4-2</div>
+      <div class="st">AI 카테고리 자동 추론</div>
+      <div class="si">source_category null인 place 대상
+GPT로 카테고리 자동 추론
+→ source_category 업데이트
+→ domain_mapper 재실행
+→ display_domain 자동 매핑
+→ 프론트 필터 노출 가능</div>
+      <div class="tags"><span class="tag t-ai">GPT</span><span class="tag t-auto">자동</span></div>
+    </div>
+    <div class="step full">
+      <div class="sn">4-3</div>
+      <div class="st">sync 방식 소스별 자유 구현</div>
+      <div class="si">각 소스 어댑터 안에서 해결 — 파이프라인은 stage.raw_documents의 sync_status 결과만 받음
+크롤링: HTML diff · 업데이트 날짜 비교로 변경 감지
+AI서치: 주기적 재수집 · 신뢰도 기반 갱신
+외부 API: 각 API 방식에 맞게 구현
+→ sync_status = 'new'|'modified' 기록 후 공통 파이프라인 통과</div>
+      <div class="tags"><span class="tag t-sync">SYNC</span><span class="tag t-code">코드</span></div>
+    </div>
+  </div>
+</div>
+
+
+<div class="sec">핵심 기능 요약 — 공통 파이프라인 모듈</div>
+
+<div class="source-block src-core">
+  <div class="sb-header" style="background:var(--bg3);">
+    <span class="sb-title">전체 핵심 기능 — 모든 소스가 공유하는 공통 모듈</span>
+  </div>
+  <div class="steps">
+    <div class="step">
+      <div class="sn">CORE-1</div>
+      <div class="st" style="color:var(--blue)">CsvSchemaInspector</div>
+      <div class="si">CSV 1~2행으로 컬럼·타입·ID형식
+·좌표계 자동 파악
+schema_report.json 자동 생성
+→ 모든 소스 수집 전 1회 실행</div>
+      <div class="tags"><span class="tag t-code">공통</span><span class="tag t-csv">CSV</span></div>
+    </div>
+    <div class="step">
+      <div class="sn">CORE-2</div>
+      <div class="st" style="color:var(--cyan)">Sync Checker (소스별 구현)</div>
+      <div class="si">관광공사: areaBasedSyncList2
+행안부: BASE_DATE history API
+문체부: CSV교체 + 이벤트 폴링
+크롤링: 소스별 자유 구현
+→ sync_status만 파이프라인 전달</div>
+      <div class="tags"><span class="tag t-sync">SYNC</span><span class="tag t-api">어댑터별</span></div>
+    </div>
+    <div class="step">
+      <div class="sn">CORE-3</div>
+      <div class="st" style="color:var(--purple)">Dedup 3단계 앙상블</div>
+      <div class="si">PostGIS 50m 공간필터
++ 상호명 앙상블 (0.82 임계값)
+  Jaro-Winkler · Token Sort · 자모분리
++ 소스 우선순위 병합
+→ place_source_ids 멀티소스 연결</div>
+      <div class="tags"><span class="tag t-merge">Merge</span><span class="tag t-code">공통</span></div>
+    </div>
+    <div class="step">
+      <div class="sn">CORE-4</div>
+      <div class="st" style="color:var(--pink)">AI 번역 Batch 파이프라인</div>
+      <div class="si">translation_fill_queue → JSONL
+→ OpenAI Batch API (비용 50% 절감)
+→ 10개 언어 · GPT-4.1 mini
+→ places_snapshot trigger 자동 갱신
+신규·변경분만 처리</div>
+      <div class="tags"><span class="tag t-ai">GPT-4.1 mini</span><span class="tag t-auto">자동</span></div>
+    </div>
+    <div class="step">
+      <div class="sn">CORE-5</div>
+      <div class="st" style="color:var(--amber)">domain_map + region_map</div>
+      <div class="si">JSON 파일 수정만으로
+전체 도메인·지역 분류 변경
+새 소스 = JSON 키 추가만
+새 도메인 = JSON 블록 추가만
+지역명 다국어도 region_map 관리</div>
+      <div class="tags"><span class="tag t-json">JSON</span><span class="tag t-auto">자동매핑</span></div>
+    </div>
+    <div class="step">
+      <div class="sn">CORE-6</div>
+      <div class="st" style="color:var(--amber)">AI 챗봇 (GPT-4.1)</div>
+      <div class="si">pgvector 의미 검색
+source_category 전체 대상 (null 포함)
+멀티턴 대화 · Function Calling
+일정 추천 · 동선 최적화
+→ 새 소스 추가 시 자동 확장</div>
+      <div class="tags"><span class="tag t-ai">GPT-4.1</span><span class="tag t-auto">자동확장</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="sec">API 확장 — 새 공공데이터 API 추가 시 작업 순서</div>
+
+<div class="source-block src-core">
+  <div class="sb-header" style="background:var(--bg3);">
+    <span class="sb-badge" style="background:var(--green-bg); color:var(--green); border:1px solid var(--green-b);">가이드</span>
+    <span class="sb-title">새 공공데이터 API 추가 시 4단계 요약</span>
+  </div>
+  <div class="steps">
+    <div class="step">
+      <div class="sn">STEP 1</div>
+      <div class="st"><span style="color:var(--blue)">①</span> 수집기 작성</div>
+      <div class="si">adapters/new_api/collector.py 작성
+- source_name = 'new_api' <span style="color:var(--text3)">(이름만 지정)</span>
+- API 호출 로직 작성
+- 결과를 stage.raw_documents에 INSERT</div>
+      <div class="tags"><span class="tag t-code">코드</span><span class="tag t-new">NEW</span></div>
+    </div>
+    <div class="step">
+      <div class="sn">STEP 2</div>
+      <div class="st"><span style="color:var(--cyan)">②</span> sync 방식 구현</div>
+      <div class="si">adapters/new_api/sync_checker.py 작성
+- 해당 API의 변경 감지 방식에 맞게 구현
+- 결과는 sync_status = 'new'|'modified' 로 통일</div>
+      <div class="tags"><span class="tag t-sync">SYNC</span><span class="tag t-code">코드</span></div>
+    </div>
+    <div class="step">
+      <div class="sn">STEP 3</div>
+      <div class="st"><span style="color:var(--amber)">③</span> JSON 파일 업데이트</div>
+      <div class="si"><b>domain_map.json</b>
+해당 API 카테고리 코드 확인 후 추가
+"new_api": {
+  "카테고리코드A": "kfood",
+  "카테고리코드B": "ktourism"
+}
+
+<b>region_map.json</b>
+지역코드 확인 후 추가
+"new_api_code": "서울" 매핑</div>
+      <div class="tags"><span class="tag t-json">JSON</span></div>
+    </div>
+    <div class="step">
+      <div class="sn">STEP 4</div>
+      <div class="st"><span style="color:var(--green)">④</span> 끝 (자동 연동)</div>
+      <div class="si">나머지는 자동 처리됩니다.
+
+<b>정규화 → Dedup → 번역 → 서비스 → AI챗봇</b>
+
+<span style="color:var(--text3)">기존 공통 파이프라인 코드를 1줄도 수정할 필요 없이 연동이 완료됩니다.</span></div>
+      <div class="tags"><span class="tag t-auto">자동화</span><span class="tag t-reuse">공통 재사용</span></div>
+    </div>
+  </div>
+</div>
+
+
+</body>
+</html>

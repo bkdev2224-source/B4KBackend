@@ -1,0 +1,155 @@
+{
+  "1": {
+    "ko": "서울",
+    "en": "Seoul",
+    "ja": "ソウル",
+    "zh-CN": "首尔",
+    "zh-TW": "首爾",
+    "mois_code": "서울특별시",
+    "mcst_code": "서울"
+  },
+  "2": {
+    "ko": "인천",
+    "en": "Incheon",
+    "ja": "仁川",
+    "zh-CN": "仁川",
+    "zh-TW": "仁川",
+    "mois_code": "인천광역시",
+    "mcst_code": "인천"
+  },
+  "3": {
+    "ko": "대전",
+    "en": "Daejeon",
+    "ja": "大田",
+    "zh-CN": "大田",
+    "zh-TW": "大田",
+    "mois_code": "대전광역시",
+    "mcst_code": "대전"
+  },
+  "4": {
+    "ko": "대구",
+    "en": "Daegu",
+    "ja": "大邱",
+    "zh-CN": "大邱",
+    "zh-TW": "大邱",
+    "mois_code": "대구광역시",
+    "mcst_code": "대구"
+  },
+  "5": {
+    "ko": "광주",
+    "en": "Gwangju",
+    "ja": "光州",
+    "zh-CN": "光州",
+    "zh-TW": "光州",
+    "mois_code": "광주광역시",
+    "mcst_code": "광주"
+  },
+  "6": {
+    "ko": "부산",
+    "en": "Busan",
+    "ja": "釜山",
+    "zh-CN": "釜山",
+    "zh-TW": "釜山",
+    "mois_code": "부산광역시",
+    "mcst_code": "부산"
+  },
+  "7": {
+    "ko": "울산",
+    "en": "Ulsan",
+    "ja": "蔚山",
+    "zh-CN": "蔚山",
+    "zh-TW": "蔚山",
+    "mois_code": "울산광역시",
+    "mcst_code": "울산"
+  },
+  "8": {
+    "ko": "세종",
+    "en": "Sejong",
+    "ja": "世宗",
+    "zh-CN": "世宗",
+    "zh-TW": "世宗",
+    "mois_code": "세종특별자치시",
+    "mcst_code": "세종"
+  },
+  "31": {
+    "ko": "경기",
+    "en": "Gyeonggi",
+    "ja": "京畿道",
+    "zh-CN": "京畿道",
+    "zh-TW": "京畿道",
+    "mois_code": "경기도",
+    "mcst_code": "경기"
+  },
+  "32": {
+    "ko": "강원",
+    "en": "Gangwon",
+    "ja": "江原道",
+    "zh-CN": "江原道",
+    "zh-TW": "江原道",
+    "mois_code": "강원특별자치도",
+    "mcst_code": "강원"
+  },
+  "33": {
+    "ko": "충북",
+    "en": "Chungbuk",
+    "ja": "忠清北道",
+    "zh-CN": "忠清北道",
+    "zh-TW": "忠清北道",
+    "mois_code": "충청북도",
+    "mcst_code": "충북"
+  },
+  "34": {
+    "ko": "충남",
+    "en": "Chungnam",
+    "ja": "忠清南道",
+    "zh-CN": "忠清南道",
+    "zh-TW": "忠清南道",
+    "mois_code": "충청남도",
+    "mcst_code": "충남"
+  },
+  "35": {
+    "ko": "경북",
+    "en": "Gyeongbuk",
+    "ja": "慶尚北道",
+    "zh-CN": "庆尚北道",
+    "zh-TW": "慶尚北道",
+    "mois_code": "경상북도",
+    "mcst_code": "경북"
+  },
+  "36": {
+    "ko": "경남",
+    "en": "Gyeongnam",
+    "ja": "慶尚南道",
+    "zh-CN": "庆尚南道",
+    "zh-TW": "慶尚南道",
+    "mois_code": "경상남도",
+    "mcst_code": "경남"
+  },
+  "37": {
+    "ko": "전북",
+    "en": "Jeonbuk",
+    "ja": "全羅北道",
+    "zh-CN": "全罗北道",
+    "zh-TW": "全羅北道",
+    "mois_code": "전라북도",
+    "mcst_code": "전북"
+  },
+  "38": {
+    "ko": "전남",
+    "en": "Jeonnam",
+    "ja": "全羅南道",
+    "zh-CN": "全罗南道",
+    "zh-TW": "全羅南道",
+    "mois_code": "전라남도",
+    "mcst_code": "전남"
+  },
+  "39": {
+    "ko": "제주",
+    "en": "Jeju",
+    "ja": "済州島",
+    "zh-CN": "济州岛",
+    "zh-TW": "濟州島",
+    "mois_code": "제주특별자치도",
+    "mcst_code": "제주"
+  }
+}
