@@ -9,7 +9,6 @@ Phase 1 전체 파이프라인 실행 스크립트
     --translate  번역 큐 제출
     --collect    번역 결과 수거
     --images     Cloudinary 이미지 업로드
-    --index      pgvector 임베딩 인덱스 구축
     --all        위 전체 실행 (순서대로)
 """
 import argparse
@@ -70,7 +69,6 @@ def main() -> int:
     parser.add_argument("--translate", action="store_true", help="번역 Batch 제출")
     parser.add_argument("--collect",   action="store_true", help="번역 결과 수거")
     parser.add_argument("--images",    action="store_true", help="Cloudinary 이미지 업로드")
-    parser.add_argument("--index",     action="store_true", help="pgvector 임베딩 인덱스")
     parser.add_argument("--all",       action="store_true", help="전체 실행")
     args = parser.parse_args()
 
@@ -80,10 +78,9 @@ def main() -> int:
         args.translate = True
         args.collect   = True
         args.images    = True
-        args.index     = True
 
     if not any([args.csv, args.sync, args.normalize, args.translate,
-                args.collect, args.images, args.index]):
+                args.collect, args.images]):
         parser.print_help()
         return 0
 
@@ -182,19 +179,6 @@ def main() -> int:
             from pipeline.image_pipeline import ImagePipeline
             result = ImagePipeline().run()
             step_ok(tag, f"업로드 {result.get('uploaded', 0)}, 스킵 {result.get('skipped', 0)}, 에러 {result.get('error', 0)}")
-        except Exception as exc:
-            return step_fail(tag, exc)
-
-    # ──────────────────────────────────────────────────────────────
-    # [1-10] pgvector 임베딩
-    # ──────────────────────────────────────────────────────────────
-    if args.index:
-        tag = "1-10"
-        step_start(tag, "pgvector 임베딩 인덱스 구축")
-        try:
-            from pipeline.chatbot.chatbot import KCultureChatbot
-            cnt = KCultureChatbot().index_places(batch_size=500)
-            step_ok(tag, f"{cnt}건 임베딩 완료")
         except Exception as exc:
             return step_fail(tag, exc)
 

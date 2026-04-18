@@ -33,8 +33,6 @@ class Settings(BaseSettings):
     # ── OpenAI ────────────────────────────────────────────────────────────────
     openai_api_key: str = Field("", env="OPENAI_API_KEY")
     openai_translation_model: str = "gpt-4.1-mini"
-    openai_chat_model: str = "gpt-4.1"
-    openai_embedding_model: str = "text-embedding-3-small"
 
     # ── Cloudinary ────────────────────────────────────────────────────────────
     cloudinary_cloud_name: str = Field("", env="CLOUDINARY_CLOUD_NAME")

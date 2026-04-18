@@ -240,7 +240,7 @@ CREATE INDEX IF NOT EXISTS idx_snapshot_domain  ON service.places_snapshot (disp
 CREATE INDEX IF NOT EXISTS idx_snapshot_region  ON service.places_snapshot (display_region) WHERE is_publishable;
 
 
--- pgvector 임베딩 검색 인덱스
+-- pgvector 임베딩 검색 인덱스 (B4KChatAI가 읽음)
 CREATE TABLE IF NOT EXISTS service.search_index (
     place_id    BIGINT PRIMARY KEY REFERENCES core.places(place_id) ON DELETE CASCADE,
     embedding   vector(1536),                    -- text-embedding-3-small
@@ -290,7 +290,7 @@ CREATE INDEX IF NOT EXISTS idx_reviews_place ON "user".reviews (place_id);
 
 
 -- =============================================================================
--- AI SCHEMA
+-- AI SCHEMA — 챗봇 세션/메시지/일정 (B4KChatAI 서비스가 읽고 씀)
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS ai.chat_sessions (

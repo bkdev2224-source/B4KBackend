@@ -11,7 +11,7 @@ from api.routes.users import auth_router, bookmark_router, review_router
 app = FastAPI(
     title="K-Culture Platform API",
     version="1.0.0",
-    description="K-Culture 장소 정보 · 다국어 번역 · AI 챗봇",
+    description="K-Culture 장소 정보 · 다국어 번역",
 )
 
 app.add_middleware(
