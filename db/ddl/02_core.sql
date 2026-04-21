@@ -178,7 +178,8 @@ CREATE INDEX IF NOT EXISTS idx_translation_fill_queue_pending
 CREATE TABLE IF NOT EXISTS core.dedup_review_queue (
     id              BIGSERIAL   PRIMARY KEY,
     poi_id_a        BIGINT      NOT NULL REFERENCES core.poi(id),
-    poi_id_b        BIGINT      NOT NULL REFERENCES core.poi(id),
+    poi_id_b        BIGINT               REFERENCES core.poi(id),  -- NULL = 아직 정규화 전
+    raw_doc_id      BIGINT               REFERENCES stage.raw_documents(id) ON DELETE SET NULL,
     distance_m      FLOAT,
     name_similarity FLOAT,
     status          VARCHAR(20) NOT NULL DEFAULT 'pending'
@@ -189,8 +190,8 @@ CREATE TABLE IF NOT EXISTS core.dedup_review_queue (
 
 CREATE INDEX IF NOT EXISTS idx_dedup_review_queue_poi_a
     ON core.dedup_review_queue(poi_id_a);
-CREATE INDEX IF NOT EXISTS idx_dedup_review_queue_poi_b
-    ON core.dedup_review_queue(poi_id_b);
+CREATE INDEX IF NOT EXISTS idx_dedup_review_queue_raw_doc
+    ON core.dedup_review_queue(raw_doc_id) WHERE raw_doc_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_dedup_review_queue_status
     ON core.dedup_review_queue(status) WHERE status = 'pending';
 

@@ -248,11 +248,11 @@ class DedupEnsemble:
             cur.execute(
                 """
                 INSERT INTO core.dedup_review_queue
-                       (poi_id_a, poi_id_b, name_similarity)
+                       (poi_id_a, raw_doc_id, name_similarity)
                 VALUES (%s, %s, %s)
                 ON CONFLICT DO NOTHING
                 """,
-                (poi_id_a, poi_id_a, round(score, 4)),
+                (poi_id_a, raw["id"], round(score, 4)),
             )
             # raw_document는 처리되지 않은 상태로 유지 (normalizer 재실행 대기)
             # is_processed = FALSE 그대로 두고 별도 메타만 기록
