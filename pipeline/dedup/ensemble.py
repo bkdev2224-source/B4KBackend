@@ -128,7 +128,7 @@ class DedupEnsemble:
                 SELECT id AS place_id, name_ko AS name, source_ids
                   FROM core.poi
                  WHERE ST_DWithin(
-                         geom,
+                         geom::geography,
                          ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography,
                          %s
                        )
