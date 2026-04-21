@@ -149,7 +149,6 @@ class PlaceNormalizer:
         for row in rows:
             data        = row["raw_json"]
             external_id = row["external_id"]
-            source_id   = row["source_id"]      # FK int to stage.api_sources
 
             lat = self._safe_float(data.get("lat") or data.get("mapy"))
             lng = self._safe_float(data.get("lng") or data.get("mapx"))
@@ -168,11 +167,10 @@ class PlaceNormalizer:
             name    = (data.get("name")    or data.get("title") or "").strip()
             address = (data.get("address") or data.get("addr1") or "").strip() or None
 
-            # FIX: quality must be 'full'/'partial'/'missing' string (CHECK constraint)
             quality = self._calc_quality(name, address, geom_wkt)
 
-            # source_ids JSONB: store external_id keyed by source_id (int as str)
-            source_ids = json.dumps({str(source_id): external_id})
+            # source_ids JSONB: keyed by source name (e.g. "tourapi")
+            source_ids = json.dumps({row["source_name"]: external_id})
 
             category_code   = data.get("cat3") or data.get("cat2") or data.get("cat1") or None
             content_type_id = str(data.get("contenttypeid") or "").strip() or None
@@ -182,8 +180,6 @@ class PlaceNormalizer:
                 data.get("areacode") or data.get("region_code") or
                 data.get("행정구역코드") or None
             )
-            # source_ids key = source name (e.g. "tourapi"), NOT integer id
-            source_ids = json.dumps({row["source_name"]: external_id})
 
             data_list.append((
                 source_ids,
