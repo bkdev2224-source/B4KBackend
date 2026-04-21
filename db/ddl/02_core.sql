@@ -12,6 +12,16 @@ CREATE TABLE IF NOT EXISTS core.supported_languages (
     is_active BOOLEAN      NOT NULL DEFAULT TRUE
 );
 
+INSERT INTO core.supported_languages (code, name) VALUES
+    ('ko',    '한국어'),
+    ('en',    'English'),
+    ('ja',    '日本語'),
+    ('zh-CN', '简体中文'),
+    ('zh-TW', '繁體中文'),
+    ('th',    'ภาษาไทย'),
+    ('pt-BR', 'Português (Brasil)')
+ON CONFLICT (code) DO NOTHING;
+
 -- K-culture 태그
 -- category 예시: 'kfood', 'kfashion', 'kbeauty_product', 'ktourism', 'kcultural'
 -- parent_tag_id 로 계층 구성 가능 (한식 → 분식 → 떡볶이)
