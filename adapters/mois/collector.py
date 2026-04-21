@@ -120,7 +120,7 @@ class MoisCollector:
                         total, new_cnt, mod_cnt, skip_cnt,
                     )
 
-            self._update_sync_run(conn, run_id, "success", new_cnt, mod_cnt, 0)
+            self._update_sync_run(conn, run_id, "done", new_cnt, mod_cnt, 0)
             self._update_sync_state(conn, run_id)
 
         logger.info(
@@ -160,7 +160,7 @@ class MoisCollector:
                         total, new_cnt, mod_cnt, skip_cnt,
                     )
 
-            self._update_sync_run(conn, run_id, "success", new_cnt, mod_cnt, 0)
+            self._update_sync_run(conn, run_id, "done", new_cnt, mod_cnt, 0)
             self._update_sync_state(conn, run_id)
 
         logger.info(

@@ -86,7 +86,7 @@ class TourApiCollector:
                     )
 
             logger.info("[1-1] sync_run 상태 업데이트 중...")
-            self._update_sync_run(conn, run_id, "success", new_cnt, mod_cnt, 0)
+            self._update_sync_run(conn, run_id, "done", new_cnt, mod_cnt, 0)
             self._update_sync_state(conn, run_id)
 
         logger.info(
@@ -122,7 +122,7 @@ class TourApiCollector:
                         processed, new_cnt, mod_cnt,
                     )
 
-            self._update_sync_run(conn, run_id, "success", new_cnt, mod_cnt, 0)
+            self._update_sync_run(conn, run_id, "done", new_cnt, mod_cnt, 0)
             self._update_sync_state(conn, run_id)
 
         logger.info(

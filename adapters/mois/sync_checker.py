@@ -112,7 +112,7 @@ class MoisSyncChecker:
                     error_cnt += 1
                     logger.error("MOIS sync 실패 (category=%s): %s", category, exc)
 
-            final_status = "partial" if error_cnt else "success"
+            final_status = "failed" if error_cnt else "done"
             with get_conn() as conn:
                 self._update_sync_run(conn, run_id, final_status, new_cnt, mod_cnt)
                 self._update_sync_state(conn, run_id)
