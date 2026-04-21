@@ -104,7 +104,7 @@ def list_places(
     params: list[Any] = []
 
     if domain:
-        where.append("display_domain = %s")
+        where.append("%s = ANY(domains)")
         params.append(domain)
     if region:
         where.append("display_region = %s")
@@ -159,7 +159,7 @@ def search_places(
     params.extend([like, like])
 
     if domain:
-        where.append("s.display_domain = %s")
+        where.append("%s = ANY(s.domains)")
         params.append(domain)
     if region:
         where.append("s.display_region = %s")

@@ -25,7 +25,8 @@ CREATE TABLE IF NOT EXISTS service.places_snapshot (
     description_pt_br  TEXT,
     coords_lat         FLOAT,
     coords_lng         FLOAT,
-    display_domain     TEXT,
+    display_domain     TEXT,                   -- 주 도메인 (1개)
+    domains            TEXT[],                 -- 전체 도메인 배열 (display_domain + 태그 카테고리)
     display_region     TEXT,
     source_category    TEXT,
     quality_score      NUMERIC(3,2),
@@ -36,6 +37,8 @@ CREATE TABLE IF NOT EXISTS service.places_snapshot (
 
 CREATE INDEX IF NOT EXISTS idx_snapshot_domain
     ON service.places_snapshot (display_domain) WHERE is_publishable = TRUE;
+CREATE INDEX IF NOT EXISTS idx_snapshot_domains
+    ON service.places_snapshot USING GIN (domains);
 CREATE INDEX IF NOT EXISTS idx_snapshot_region
     ON service.places_snapshot (display_region) WHERE is_publishable = TRUE;
 CREATE INDEX IF NOT EXISTS idx_snapshot_quality
@@ -55,7 +58,8 @@ CREATE INDEX IF NOT EXISTS idx_search_embedding
     ON service.search_index USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
 -- ─────────────────────────────────────────
--- 스냅샷 갱신 함수 (poi_translations INSERT/UPDATE 시 호출)
+-- 스냅샷 갱신 함수
+-- poi_translations INSERT/UPDATE 및 poi_tag_map 변경 시 호출
 -- ─────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION service.refresh_snapshot_for_poi(p_poi_id BIGINT)
@@ -64,6 +68,7 @@ DECLARE
     v_poi     core.poi%ROWTYPE;
     v_img_url TEXT;
     v_quality NUMERIC(3,2);
+    v_domains TEXT[];
 BEGIN
     SELECT * INTO v_poi FROM core.poi WHERE id = p_poi_id;
     IF NOT FOUND THEN RETURN; END IF;
@@ -80,8 +85,21 @@ BEGIN
      WHERE poi_id = p_poi_id AND is_primary = TRUE AND upload_status = 'uploaded'
      LIMIT 1;
 
+    -- domains 배열: display_domain(주 도메인) + poi_tag_map 태그 카테고리 합산
+    SELECT ARRAY_AGG(DISTINCT cat ORDER BY cat) INTO v_domains
+    FROM (
+        SELECT v_poi.display_domain AS cat
+        WHERE  v_poi.display_domain IS NOT NULL
+        UNION ALL
+        SELECT t.category
+          FROM core.k_culture_tags t
+          JOIN core.poi_tag_map m ON m.tag_id = t.id
+         WHERE m.poi_id = p_poi_id
+           AND t.category IS NOT NULL
+    ) sub;
+
     INSERT INTO service.places_snapshot (
-        place_id, display_domain, display_region, source_category,
+        place_id, display_domain, domains, display_region, source_category,
         quality_score, is_publishable, primary_image_url, updated_at,
         coords_lat, coords_lng,
         name_ko,    name_en,    name_ja,    name_zh_cn, name_zh_tw, name_th,    name_pt_br,
@@ -92,6 +110,7 @@ BEGIN
     SELECT
         p_poi_id,
         v_poi.display_domain,
+        v_domains,
         v_poi.display_region,
         v_poi.category_code,
         v_quality,
@@ -136,6 +155,7 @@ BEGIN
         description_th    = EXCLUDED.description_th,
         description_pt_br = EXCLUDED.description_pt_br,
         display_domain    = EXCLUDED.display_domain,
+        domains           = EXCLUDED.domains,
         display_region    = EXCLUDED.display_region,
         source_category   = EXCLUDED.source_category,
         quality_score     = EXCLUDED.quality_score,
@@ -145,6 +165,7 @@ BEGIN
 END;
 $$;
 
+-- poi_translations 변경 시 스냅샷 갱신
 CREATE OR REPLACE FUNCTION service.trg_refresh_snapshot()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
@@ -157,6 +178,22 @@ DROP TRIGGER IF EXISTS trg_translation_snapshot ON core.poi_translations;
 CREATE TRIGGER trg_translation_snapshot
     AFTER INSERT OR UPDATE ON core.poi_translations
     FOR EACH ROW EXECUTE FUNCTION service.trg_refresh_snapshot();
+
+-- poi_tag_map 변경 시 스냅샷 domains 재계산
+CREATE OR REPLACE FUNCTION service.trg_refresh_snapshot_on_tag()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+    PERFORM service.refresh_snapshot_for_poi(
+        CASE TG_OP WHEN 'DELETE' THEN OLD.poi_id ELSE NEW.poi_id END
+    );
+    RETURN NULL;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_tag_map_snapshot ON core.poi_tag_map;
+CREATE TRIGGER trg_tag_map_snapshot
+    AFTER INSERT OR UPDATE OR DELETE ON core.poi_tag_map
+    FOR EACH ROW EXECUTE FUNCTION service.trg_refresh_snapshot_on_tag();
 
 -- en 번역 완료 시 is_publishable 자동 갱신
 CREATE OR REPLACE FUNCTION service.trg_set_publishable()
