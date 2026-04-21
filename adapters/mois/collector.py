@@ -326,8 +326,8 @@ class MoisCollector:
         if row:
             return row["id"]
         cur.execute(
-            "INSERT INTO stage.api_sources (name, display_name) VALUES (%s, %s) RETURNING id",
-            (self.SOURCE_NAME, self.SOURCE_NAME),
+            "INSERT INTO stage.api_sources (name) VALUES (%s) RETURNING id",
+            (self.SOURCE_NAME,),
         )
         conn.commit()
         return cur.fetchone()["id"]

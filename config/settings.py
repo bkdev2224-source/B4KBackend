@@ -73,6 +73,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = str(BASE_DIR / ".env")
         env_file_encoding = "utf-8"
+        extra = "ignore"
 
 
 settings = Settings()
