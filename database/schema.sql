@@ -182,6 +182,25 @@ CREATE TABLE IF NOT EXISTS core.translation_rules (
 CREATE INDEX IF NOT EXISTS idx_translation_rules_lang ON core.translation_rules (lang) WHERE is_active;
 
 
+-- 번역 용어집 — 특정 단어·표현의 언어별 고정 번역 (프롬프트 glossary 섹션에 주입)
+-- rules와의 차이: rules는 행동 지침(문체·형식), glossary는 단어 단위 1:1 대응표
+CREATE TABLE IF NOT EXISTS core.translation_glossary (
+    id          BIGSERIAL PRIMARY KEY,
+    term_ko     TEXT NOT NULL,              -- 한국어 원문 표현
+    lang        TEXT NOT NULL,              -- 대상 언어 ('en','ja','zh-CN','zh-TW','th','pt-BR')
+    translation TEXT NOT NULL,             -- 고정 번역어
+    category    TEXT,                      -- 분류 (예: '음식', '관광지', '브랜드', '행정구역')
+    note        TEXT,                      -- 관리자 메모 (선택)
+    priority    SMALLINT NOT NULL DEFAULT 0,  -- 높을수록 먼저 주입
+    is_active   BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (term_ko, lang)
+);
+
+CREATE INDEX IF NOT EXISTS idx_glossary_lang ON core.translation_glossary (lang) WHERE is_active;
+CREATE INDEX IF NOT EXISTS idx_glossary_term ON core.translation_glossary (term_ko);
+
+
 -- 이미지 — Cloudinary CDN
 CREATE TABLE IF NOT EXISTS core.place_images (
     id              BIGSERIAL PRIMARY KEY,

@@ -17,7 +17,7 @@ import google.generativeai as genai
 
 from config.settings import settings
 from database.db import get_conn
-from pipeline.translator._utils import load_translation_rules, split_by_token_budget
+from pipeline.translator._utils import load_prompt_additions, split_by_token_budget
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +65,7 @@ class GeminiBatchTranslator:
         # 언어별 모델 생성 (시스템 프롬프트에 규칙 주입) + 토큰 청크 분할
         work_items: list[tuple[str, list[dict], genai.GenerativeModel]] = []
         for lang, lang_rows in by_lang.items():
-            rules_text = load_translation_rules(lang)
+            rules_text = load_prompt_additions(lang)
             model = genai.GenerativeModel(
                 model_name=settings.gemini_translation_model,
                 system_instruction=_BASE_SYSTEM + rules_text,

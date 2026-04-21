@@ -64,3 +64,36 @@ def load_translation_rules(lang: str) -> str:
     return "\n\nAdditional translation rules (must follow exactly):\n" + "\n".join(
         f"- {r}" for r in rules
     )
+
+
+def load_translation_glossary(lang: str) -> str:
+    """
+    core.translation_glossary에서 해당 언어의 고정 번역 용어집을 로드.
+    반환값은 시스템 프롬프트 뒤에 붙일 텍스트 블록 (없으면 빈 문자열).
+    """
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT term_ko, translation
+              FROM core.translation_glossary
+             WHERE is_active = TRUE
+               AND lang = %s
+             ORDER BY priority DESC, id
+            """,
+            (lang,),
+        )
+        terms = cur.fetchall()
+
+    if not terms:
+        return ""
+    lines = "\n".join(f"- {row['term_ko']} → {row['translation']}" for row in terms)
+    return (
+        "\n\nGlossary (these terms MUST be translated exactly as specified below — "
+        "do not paraphrase or invent alternatives):\n" + lines
+    )
+
+
+def load_prompt_additions(lang: str) -> str:
+    """rules + glossary를 하나의 블록으로 합쳐 반환."""
+    return load_translation_rules(lang) + load_translation_glossary(lang)

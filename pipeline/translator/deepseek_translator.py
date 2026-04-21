@@ -18,7 +18,7 @@ from openai import OpenAI
 
 from config.settings import settings
 from database.db import get_conn
-from pipeline.translator._utils import load_translation_rules, split_by_token_budget
+from pipeline.translator._utils import load_prompt_additions, split_by_token_budget
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ class DeepSeekTranslator:
         # 언어별 규칙 로드 + 토큰 청크 분할
         work_items: list[tuple[str, list[dict], str]] = []  # (lang, chunk, system_prompt)
         for lang, lang_rows in by_lang.items():
-            rules_text = load_translation_rules(lang)
+            rules_text = load_prompt_additions(lang)
             system_prompt = _BASE_SYSTEM + rules_text
             for chunk in split_by_token_budget(lang_rows, settings.translation_token_budget):
                 work_items.append((lang, chunk, system_prompt))
