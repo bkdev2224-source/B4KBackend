@@ -146,22 +146,40 @@ CREATE TABLE IF NOT EXISTS core.place_source_ids (
     UNIQUE (source_name, source_id)
 );
 
--- 번역 (10개 언어)
+-- 번역
+-- address 컬럼은 lang='en' 행에만 값이 들어간다 (주소정보누리집 API 한→영 변환).
+-- 다른 언어(ja/zh-CN/zh-TW/th)는 도로명 주소를 번역하지 않으므로 address=NULL.
 CREATE TABLE IF NOT EXISTS core.place_translations (
     id              BIGSERIAL PRIMARY KEY,
     place_id        BIGINT NOT NULL REFERENCES core.places(place_id) ON DELETE CASCADE,
-    lang            TEXT NOT NULL,               -- 'ko' | 'en' | 'ja' | ...
+    lang            TEXT NOT NULL,               -- 'en' | 'ja' | 'zh-CN' | 'zh-TW' | 'th'
     name            TEXT,
-    address         TEXT,
+    address         TEXT,                        -- en만 사용 (주소정보누리집 API)
     description     TEXT,
     translated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-    model_used      TEXT,                        -- 'gpt-4.1-mini'
+    model_used      TEXT,                        -- 'gemini-2.5-flash' | 'deepseek-chat' | 'juso_api'
     is_retranslation BOOLEAN NOT NULL DEFAULT FALSE,
     UNIQUE (place_id, lang)
 );
 
 CREATE INDEX IF NOT EXISTS idx_translations_place ON core.place_translations (place_id);
 CREATE INDEX IF NOT EXISTS idx_translations_lang  ON core.place_translations (lang);
+
+
+-- 번역 규칙 — 번역기 시스템 프롬프트에 주입되는 규칙 (lang NULL = 모든 언어 공통)
+-- rule_type: 'term'(용어통일) | 'style'(문체) | 'format'(형식) | 'preserve'(원문유지)
+CREATE TABLE IF NOT EXISTS core.translation_rules (
+    id          BIGSERIAL PRIMARY KEY,
+    rule_type   TEXT NOT NULL CHECK (rule_type IN ('term', 'style', 'format', 'preserve')),
+    lang        TEXT,                      -- NULL = 전 언어 공통
+    rule_text   TEXT NOT NULL,             -- 프롬프트에 삽입할 규칙 문장 (영어)
+    example     TEXT,                      -- 예시 (선택)
+    priority    SMALLINT NOT NULL DEFAULT 0,  -- 높을수록 먼저 삽입
+    is_active   BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_translation_rules_lang ON core.translation_rules (lang) WHERE is_active;
 
 
 -- 이미지 — Cloudinary CDN
@@ -185,7 +203,9 @@ CREATE INDEX IF NOT EXISTS idx_place_images_place  ON core.place_images (place_i
 CREATE INDEX IF NOT EXISTS idx_place_images_status ON core.place_images (upload_status);
 
 
--- 번역 대기 큐 — 신규/변경 place를 자동으로 번역 파이프라인에 투입
+-- 번역 대기 큐 — 신규/변경 place의 name·description 번역 작업 추적
+-- address 번역(한→영, Juso API)은 이 큐를 거치지 않고 JusoAddressTranslator가 직접 처리한다.
+-- provider: 'gemini' (en/ja/th) | 'deepseek' (zh-CN/zh-TW)
 CREATE TABLE IF NOT EXISTS core.translation_fill_queue (
     id              BIGSERIAL PRIMARY KEY,
     place_id        BIGINT NOT NULL REFERENCES core.places(place_id) ON DELETE CASCADE,
@@ -195,7 +215,8 @@ CREATE TABLE IF NOT EXISTS core.translation_fill_queue (
     triggered_by    TEXT NOT NULL DEFAULT 'new'  -- 'new' | 'update' | 'manual'
                     CHECK (triggered_by IN ('new', 'update', 'manual')),
     is_retranslation BOOLEAN NOT NULL DEFAULT FALSE,
-    batch_job_id    TEXT,                        -- OpenAI Batch Job ID
+    provider        TEXT,                        -- 'gemini' | 'deepseek'
+    job_id          TEXT,                        -- Batch Job ID (provider별)
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (place_id, lang)                      -- ON CONFLICT DO NOTHING → 멱등성
@@ -210,30 +231,32 @@ CREATE INDEX IF NOT EXISTS idx_trans_queue_place  ON core.translation_fill_queue
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS service.places_snapshot (
-    place_id          BIGINT PRIMARY KEY REFERENCES core.places(place_id) ON DELETE CASCADE,
-    name_ko           TEXT,
-    name_en           TEXT,
-    name_ja           TEXT,
-    name_zh_cn        TEXT,
-    name_zh_tw        TEXT,
-    name_th           TEXT,
-    address_ko        TEXT,
-    address_en        TEXT,
-    description_ko    TEXT,
-    description_en    TEXT,
-    description_ja    TEXT,
-    description_zh_cn TEXT,
-    description_zh_tw TEXT,
-    description_th    TEXT,
-    coords_lat        FLOAT,
-    coords_lng        FLOAT,
-    display_domain    TEXT,
-    display_region    TEXT,
-    source_category   TEXT,
-    quality_score     NUMERIC(3,2),
-    primary_image_url TEXT,
-    is_publishable    BOOLEAN,
-    updated_at        TIMESTAMPTZ
+    place_id           BIGINT PRIMARY KEY REFERENCES core.places(place_id) ON DELETE CASCADE,
+    name_ko            TEXT,
+    name_en            TEXT,
+    name_ja            TEXT,
+    name_zh_cn         TEXT,
+    name_zh_tw         TEXT,
+    name_th            TEXT,
+    name_pt_br         TEXT,
+    address_ko         TEXT,
+    address_en         TEXT,              -- 주소정보누리집 API 한→영 변환
+    description_ko     TEXT,
+    description_en     TEXT,
+    description_ja     TEXT,
+    description_zh_cn  TEXT,
+    description_zh_tw  TEXT,
+    description_th     TEXT,
+    description_pt_br  TEXT,
+    coords_lat         FLOAT,
+    coords_lng         FLOAT,
+    display_domain     TEXT,
+    display_region     TEXT,
+    source_category    TEXT,
+    quality_score      NUMERIC(3,2),
+    primary_image_url  TEXT,
+    is_publishable     BOOLEAN,
+    updated_at         TIMESTAMPTZ
 );
 
 CREATE INDEX IF NOT EXISTS idx_snapshot_domain  ON service.places_snapshot (display_domain) WHERE is_publishable;
@@ -352,9 +375,10 @@ BEGIN
         place_id, display_domain, display_region, source_category,
         quality_score, is_publishable, primary_image_url, updated_at,
         coords_lat, coords_lng,
-        name_ko,    name_en,    name_ja,    name_zh_cn, name_zh_tw, name_th,
+        name_ko,    name_en,    name_ja,    name_zh_cn, name_zh_tw, name_th,    name_pt_br,
         address_ko, address_en,
-        description_ko, description_en, description_ja, description_zh_cn, description_zh_tw, description_th
+        description_ko, description_en, description_ja,
+        description_zh_cn, description_zh_tw, description_th, description_pt_br
     )
     SELECT
         v_place.place_id,
@@ -373,6 +397,7 @@ BEGIN
         MAX(CASE WHEN lang='zh-CN' THEN name END),
         MAX(CASE WHEN lang='zh-TW' THEN name END),
         MAX(CASE WHEN lang='th'    THEN name END),
+        MAX(CASE WHEN lang='pt-BR' THEN name END),
         v_place.address,
         MAX(CASE WHEN lang='en'    THEN address END),
         v_place.description,
@@ -380,30 +405,33 @@ BEGIN
         MAX(CASE WHEN lang='ja'    THEN description END),
         MAX(CASE WHEN lang='zh-CN' THEN description END),
         MAX(CASE WHEN lang='zh-TW' THEN description END),
-        MAX(CASE WHEN lang='th'    THEN description END)
+        MAX(CASE WHEN lang='th'    THEN description END),
+        MAX(CASE WHEN lang='pt-BR' THEN description END)
     FROM core.place_translations
     WHERE place_id = p_place_id
     ON CONFLICT (place_id) DO UPDATE SET
-        name_ko           = EXCLUDED.name_ko,
-        name_en           = EXCLUDED.name_en,
-        name_ja           = EXCLUDED.name_ja,
-        name_zh_cn        = EXCLUDED.name_zh_cn,
-        name_zh_tw        = EXCLUDED.name_zh_tw,
-        name_th           = EXCLUDED.name_th,
-        address_ko        = EXCLUDED.address_ko,
-        address_en        = EXCLUDED.address_en,
-        description_ko    = EXCLUDED.description_ko,
-        description_en    = EXCLUDED.description_en,
-        description_ja    = EXCLUDED.description_ja,
-        description_zh_cn = EXCLUDED.description_zh_cn,
-        description_zh_tw = EXCLUDED.description_zh_tw,
-        description_th    = EXCLUDED.description_th,
-        display_domain    = EXCLUDED.display_domain,
-        display_region    = EXCLUDED.display_region,
-        quality_score     = EXCLUDED.quality_score,
-        is_publishable    = EXCLUDED.is_publishable,
-        primary_image_url = EXCLUDED.primary_image_url,
-        updated_at        = now();
+        name_ko            = EXCLUDED.name_ko,
+        name_en            = EXCLUDED.name_en,
+        name_ja            = EXCLUDED.name_ja,
+        name_zh_cn         = EXCLUDED.name_zh_cn,
+        name_zh_tw         = EXCLUDED.name_zh_tw,
+        name_th            = EXCLUDED.name_th,
+        name_pt_br         = EXCLUDED.name_pt_br,
+        address_ko         = EXCLUDED.address_ko,
+        address_en         = EXCLUDED.address_en,
+        description_ko     = EXCLUDED.description_ko,
+        description_en     = EXCLUDED.description_en,
+        description_ja     = EXCLUDED.description_ja,
+        description_zh_cn  = EXCLUDED.description_zh_cn,
+        description_zh_tw  = EXCLUDED.description_zh_tw,
+        description_th     = EXCLUDED.description_th,
+        description_pt_br  = EXCLUDED.description_pt_br,
+        display_domain     = EXCLUDED.display_domain,
+        display_region     = EXCLUDED.display_region,
+        quality_score      = EXCLUDED.quality_score,
+        is_publishable     = EXCLUDED.is_publishable,
+        primary_image_url  = EXCLUDED.primary_image_url,
+        updated_at         = now();
 END;
 $$;
 

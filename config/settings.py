@@ -30,9 +30,18 @@ class Settings(BaseSettings):
     # ── MOIS (행정안전부) ──────────────────────────────────────────────────────
     mois_api_key: str = Field("", env="MOIS_API_KEY")
 
-    # ── OpenAI ────────────────────────────────────────────────────────────────
-    openai_api_key: str = Field("", env="OPENAI_API_KEY")
-    openai_translation_model: str = "gpt-4.1-mini"
+    # ── Gemini (name·description 번역: en/ja/th) ──────────────────────────────
+    gemini_api_key: str = Field("", env="GEMINI_API_KEY")
+    gemini_translation_model: str = Field("gemini-2.5-flash", env="GEMINI_TRANSLATION_MODEL")
+
+    # ── DeepSeek (name·description 번역: zh-CN/zh-TW) ─────────────────────────
+    deepseek_api_key: str = Field("", env="DEEPSEEK_API_KEY")
+    deepseek_translation_model: str = Field("deepseek-chat", env="DEEPSEEK_TRANSLATION_MODEL")
+    deepseek_base_url: str = "https://api.deepseek.com"
+
+    # ── 주소정보누리집 (도로명 주소 한→영 변환) ─────────────────────────────────
+    juso_api_key: str = Field("", env="JUSO_API_KEY")
+    juso_api_url: str = "https://business.juso.go.kr/addrlink/addrEngApi.do"
 
     # ── Cloudinary ────────────────────────────────────────────────────────────
     cloudinary_cloud_name: str = Field("", env="CLOUDINARY_CLOUD_NAME")
@@ -45,14 +54,16 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 60 * 24 * 7  # 1 week
 
     # ── Pipeline ──────────────────────────────────────────────────────────────
-    translation_batch_size: int = 40_000   # OpenAI Batch API limit
+    translation_batch_size: int = 500        # 1회 fetch 최대 행 수
+    translation_token_budget: int = 24_000  # 1 API 호출당 최대 토큰 예산 (입력+출력 합산)
+    deepseek_max_workers: int = 10           # DeepSeek 병렬 청크 수
     dedup_auto_merge_threshold: float = 0.92
     dedup_review_threshold: float = 0.82
     dedup_spatial_radius_m: float = 50.0
 
     # ── Supported languages ───────────────────────────────────────────────────
     supported_languages: list[str] = [
-        "en", "ja", "zh-CN", "zh-TW", "th",
+        "en", "ja", "zh-CN", "zh-TW", "th", "pt-BR",
     ]
 
     # ── Paths ─────────────────────────────────────────────────────────────────
