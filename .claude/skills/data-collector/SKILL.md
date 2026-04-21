@@ -25,7 +25,8 @@ B4KBackend의 데이터 수집 레이어 전문가. TourAPI·MOIS·크롤링 어
 - `adapters/mois/collector.py` — MOIS CSV → stage.raw_documents (초기 전체 적재)
 - `adapters/mois/sync_checker.py` — MOIS API 증분 sync
 - `adapters/crawl/` — 크롤링 어댑터
-- `database/schema.sql` — stage.* 스키마 (raw_documents, sync_runs, source_sync_state)
+- `db/ddl/01_stage.sql` — stage.* DDL 최신 정의 (raw_documents, sync_runs, source_sync_state)
+- `database/schema.sql` — 통합 DDL (레거시, 파이프라인 코드가 참조하는 기준)
 
 ## 핵심 설계 원칙
 
@@ -43,7 +44,8 @@ B4KBackend의 데이터 수집 레이어 전문가. TourAPI·MOIS·크롤링 어
 adapters/tourapi/collector.py
 adapters/mois/collector.py
 ```
-증분 sync 관련은 `adapters/tourapi/sync_checker.py`, DB 구조는 `database/schema.sql`(stage 섹션)을 추가로 읽는다.
+증분 sync 관련은 `adapters/tourapi/sync_checker.py`, DB 구조는 `db/ddl/01_stage.sql`(최신) 또는 `database/schema.sql`(stage 섹션)을 추가로 읽는다.
+**주의:** `db/ddl/01_stage.sql`이 모듈별 최신 DDL이고 `database/schema.sql`은 통합 레거시다. 실제 파이프라인 코드는 `database/schema.sql`을 참조하므로 스키마 변경 시 두 파일을 모두 확인한다.
 
 ## 고도화 포인트 (알려진 개선 기회)
 

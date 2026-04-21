@@ -9,6 +9,8 @@ import json
 import logging
 from pathlib import Path
 
+import psycopg2.extras
+
 from config.settings import settings
 from database.db import get_conn
 
@@ -68,20 +70,33 @@ class DomainMapper:
         categories: list[str],
     ) -> int:
         cur = conn.cursor()
-        cur.execute(
-            """
-            UPDATE core.places
-               SET display_domain = %s
-             WHERE source_name    = %s
-               AND source_category = ANY(%s)
-               AND (display_domain IS DISTINCT FROM %s)
-            """,
-            (domain, source_name, categories, domain),
-        )
+        # tourapi uses content_type_id ("39","12" …); mois/mcst use category_code (업태구분명 etc.)
+        if source_name == "tourapi":
+            cur.execute(
+                """
+                UPDATE core.poi
+                   SET display_domain = %s
+                 WHERE source_ids ? %s
+                   AND content_type_id = ANY(%s)
+                   AND (display_domain IS DISTINCT FROM %s)
+                """,
+                (domain, source_name, categories, domain),
+            )
+        else:
+            cur.execute(
+                """
+                UPDATE core.poi
+                   SET display_domain = %s
+                 WHERE source_ids ? %s
+                   AND category_code = ANY(%s)
+                   AND (display_domain IS DISTINCT FROM %s)
+                """,
+                (domain, source_name, categories, domain),
+            )
         return cur.rowcount
 
     def _clear_unmapped(self, conn) -> None:
-        """도메인 맵에 없는 source_category → NULL."""
+        """도메인 맵에 등록되지 않은 POI → display_domain = NULL."""
         all_pairs: list[tuple[str, str]] = []
         for domain, sources in self._domain_map.items():
             for src, cats in sources.items():
@@ -91,16 +106,22 @@ class DomainMapper:
         if not all_pairs:
             return
 
-        # 매핑 안 된 것 → NULL
         cur = conn.cursor()
-        cur.execute(
+        psycopg2.extras.execute_values(
+            cur,
             """
-            UPDATE core.places
+            UPDATE core.poi
                SET display_domain = NULL
-             WHERE (source_name, source_category) NOT IN %s
-               AND display_domain IS NOT NULL
+             WHERE display_domain IS NOT NULL
+               AND NOT EXISTS (
+                   SELECT 1 FROM (VALUES %s) AS v(src, cat)
+                    WHERE (
+                            (v.src = 'tourapi' AND source_ids ? v.src AND content_type_id = v.cat)
+                         OR (v.src != 'tourapi' AND source_ids ? v.src AND category_code = v.cat)
+                          )
+               )
             """,
-            (tuple(all_pairs),),
+            all_pairs,
         )
         if cur.rowcount:
             logger.info("도메인 매핑 해제: %d건", cur.rowcount)

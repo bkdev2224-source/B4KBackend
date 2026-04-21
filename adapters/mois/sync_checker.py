@@ -93,25 +93,34 @@ class MoisSyncChecker:
         new_cnt = mod_cnt = 0
 
         targets = categories or list(MOIS_SERVICE_MAP.keys())
+        error_cnt = 0
 
-        for category in targets:
-            service_info = MOIS_SERVICE_MAP.get(category)
-            if not service_info:
-                logger.warning("알 수 없는 MOIS 카테고리: %s", category)
-                continue
-            service_id, grp_cd = service_info
-            try:
-                n, m = self._sync_category(service_id, grp_cd, base_date)
-                new_cnt += n
-                mod_cnt += m
-                logger.info("MOIS sync 완료: %s → 신규 %d, 변경 %d", category, n, m)
-                time.sleep(0.2)     # rate-limit 배려
-            except Exception as exc:
-                logger.error("MOIS sync 실패 (category=%s): %s", category, exc)
+        try:
+            for category in targets:
+                service_info = MOIS_SERVICE_MAP.get(category)
+                if not service_info:
+                    logger.warning("알 수 없는 MOIS 카테고리: %s", category)
+                    continue
+                service_id, grp_cd = service_info
+                try:
+                    n, m = self._sync_category(service_id, grp_cd, base_date)
+                    new_cnt += n
+                    mod_cnt += m
+                    logger.info("MOIS sync 완료: %s → 신규 %d, 변경 %d", category, n, m)
+                    time.sleep(0.2)     # rate-limit 배려
+                except Exception as exc:
+                    error_cnt += 1
+                    logger.error("MOIS sync 실패 (category=%s): %s", category, exc)
 
-        with get_conn() as conn:
-            self._update_sync_run(conn, run_id, "success", new_cnt, mod_cnt)
-            self._update_sync_state(conn, run_id)
+            final_status = "partial" if error_cnt else "success"
+            with get_conn() as conn:
+                self._update_sync_run(conn, run_id, final_status, new_cnt, mod_cnt)
+                self._update_sync_state(conn, run_id)
+        except Exception as fatal_exc:
+            logger.exception("MOIS 치명적 오류 — sync_run failed로 기록: %s", fatal_exc)
+            with get_conn() as conn:
+                self._update_sync_run(conn, run_id, "failed", new_cnt, mod_cnt)
+            raise
 
         logger.info("MOIS 전체 Sync 완료: 신규 %d, 변경 %d", new_cnt, mod_cnt)
         return run_id
@@ -201,50 +210,59 @@ class MoisSyncChecker:
             items = [items]
         return items or []
 
-    def _upsert_raw(self, conn, item: dict[str, Any], status: str) -> None:
-        source_id = str(
-            item.get("MGTNO") or item.get("관리번호") or item.get("id") or ""
+    def _get_api_source_id(self, conn) -> int:
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM stage.api_sources WHERE name = %s", (self.SOURCE_NAME,))
+        row = cur.fetchone()
+        if row:
+            return row["id"]
+        cur.execute(
+            "INSERT INTO stage.api_sources (name, display_name) VALUES (%s, %s) RETURNING id",
+            (self.SOURCE_NAME, self.SOURCE_NAME),
         )
-        if not source_id:
+        conn.commit()
+        return cur.fetchone()["id"]
+
+    def _upsert_raw(self, conn, item: dict[str, Any], status: str) -> None:
+        external_id = str(
+            item.get("MGTNO") or item.get("관리번호") or item.get("id") or ""
+        ).strip()
+        if not external_id:
             return
 
-        # 키를 한글 표준명으로 정규화해 저장
+        api_source_id = self._get_api_source_id(conn)
         normalized = self._normalize_item(item)
         cur = conn.cursor()
         cur.execute(
             """
-            INSERT INTO stage.raw_documents (source_name, source_id, raw_data, sync_status)
-            VALUES (%s, %s, %s, %s)
-            ON CONFLICT (source_name, source_id) DO UPDATE
-              SET raw_data     = EXCLUDED.raw_data,
-                  sync_status  = EXCLUDED.sync_status,
-                  collected_at = now(),
-                  processed_at = NULL
+            INSERT INTO stage.raw_documents
+                (source_id, external_id, raw_json, is_processed, collected_at)
+            VALUES (%s, %s, %s, FALSE, now())
+            ON CONFLICT (source_id, external_id, language_code) DO UPDATE
+              SET raw_json     = EXCLUDED.raw_json,
+                  is_processed = FALSE,
+                  collected_at = now()
             """,
-            (self.SOURCE_NAME, source_id, json.dumps(normalized, ensure_ascii=False), status),
+            (api_source_id, external_id, json.dumps(normalized, ensure_ascii=False)),
         )
 
     def _deactivate(self, conn, item: dict[str, Any]) -> None:
-        """폐업·취소 항목 → core.places is_active=false."""
-        source_id = str(
+        """폐업·취소 항목 → core.poi is_active=false."""
+        external_id = str(
             item.get("MGTNO") or item.get("관리번호") or ""
-        )
-        if not source_id:
+        ).strip()
+        if not external_id:
             return
+        api_source_id = self._get_api_source_id(conn)
         cur = conn.cursor()
         cur.execute(
-            "UPDATE core.places SET is_active=FALSE, updated_at=now() WHERE source_name=%s AND source_id=%s",
-            (self.SOURCE_NAME, source_id),
-        )
-        # stage에도 deleted 상태 기록
-        cur.execute(
             """
-            INSERT INTO stage.raw_documents (source_name, source_id, raw_data, sync_status)
-            VALUES (%s, %s, '{}', 'deleted')
-            ON CONFLICT (source_name, source_id) DO UPDATE
-              SET sync_status = 'deleted', collected_at = now()
+            UPDATE core.poi
+               SET is_active = FALSE, updated_at = now()
+             WHERE source_ids ? %s
+               AND source_ids->>%s = %s
             """,
-            (self.SOURCE_NAME, source_id),
+            (self.SOURCE_NAME, self.SOURCE_NAME, external_id),
         )
 
     @staticmethod
@@ -287,7 +305,12 @@ class MoisSyncChecker:
         with get_conn() as conn:
             cur = conn.cursor()
             cur.execute(
-                "SELECT last_synced_at FROM stage.source_sync_state WHERE source_name = %s",
+                """
+                SELECT ss.last_synced_at
+                  FROM stage.source_sync_state ss
+                  JOIN stage.api_sources s ON s.id = ss.source_id
+                 WHERE s.name = %s
+                """,
                 (self.SOURCE_NAME,),
             )
             row = cur.fetchone()
@@ -295,14 +318,16 @@ class MoisSyncChecker:
 
     def _create_sync_run(self) -> int:
         with get_conn() as conn:
+            api_source_id = self._get_api_source_id(conn)
             cur = conn.cursor()
             cur.execute(
                 """
-                INSERT INTO stage.sync_runs (source_name, run_type, status)
-                VALUES (%s, 'incremental', 'running') RETURNING id
+                INSERT INTO stage.sync_runs (source_id, run_type, status)
+                VALUES (%s, 'fetch_updated', 'running') RETURNING id
                 """,
-                (self.SOURCE_NAME,),
+                (api_source_id,),
             )
+            conn.commit()
             return cur.fetchone()["id"]
 
     def _update_sync_run(
@@ -312,10 +337,11 @@ class MoisSyncChecker:
         cur.execute(
             """
             UPDATE stage.sync_runs
-               SET status = %s, finished_at = now(), new_count = %s, modified_count = %s
+               SET status = %s, finished_at = now(),
+                   records_collected = %s
              WHERE id = %s
             """,
-            (status, new_cnt, mod_cnt, run_id),
+            (status, new_cnt + mod_cnt, run_id),
         )
 
     def _update_sync_state(self, conn, run_id: int) -> None:
@@ -323,8 +349,8 @@ class MoisSyncChecker:
         cur.execute(
             """
             UPDATE stage.source_sync_state
-               SET last_synced_at = now(), last_run_id = %s
-             WHERE source_name = %s
+               SET last_synced_at = now()
+             WHERE source_id = (SELECT id FROM stage.api_sources WHERE name = %s)
             """,
-            (run_id, self.SOURCE_NAME),
+            (self.SOURCE_NAME,),
         )

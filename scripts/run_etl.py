@@ -27,7 +27,7 @@ import asyncpg
 ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
 
-from settings import settings
+from config.settings import settings
 from etl.transform import normalize_poi, normalize_translation
 from etl.fill_queue import enqueue_missing_translations
 from etl.cloudinary_pipeline import process_poi_images

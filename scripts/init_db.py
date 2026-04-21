@@ -24,20 +24,18 @@ SEP = "-" * 60
 TRUNCATE_SQL = """
 DO $$
 BEGIN
+    -- v3 테이블명 기준 (core.poi, core.poi_images, core.translation_fill_queue)
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='core' AND table_name='translation_fill_queue') THEN
         TRUNCATE core.translation_fill_queue CASCADE;
     END IF;
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='core' AND table_name='place_translations') THEN
-        TRUNCATE core.place_translations CASCADE;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='core' AND table_name='poi_translations') THEN
+        TRUNCATE core.poi_translations CASCADE;
     END IF;
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='core' AND table_name='place_images') THEN
-        TRUNCATE core.place_images CASCADE;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='core' AND table_name='poi_images') THEN
+        TRUNCATE core.poi_images CASCADE;
     END IF;
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='core' AND table_name='place_source_ids') THEN
-        TRUNCATE core.place_source_ids CASCADE;
-    END IF;
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='core' AND table_name='places') THEN
-        TRUNCATE core.places CASCADE;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='core' AND table_name='poi') THEN
+        TRUNCATE core.poi CASCADE;
     END IF;
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='stage' AND table_name='raw_documents') THEN
         TRUNCATE stage.raw_documents CASCADE;
@@ -63,9 +61,14 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    schema_sql = (
-        Path(__file__).parent.parent / "database" / "schema.sql"
-    ).read_text(encoding="utf-8")
+    ddl_dir = Path(__file__).parent.parent / "db" / "ddl"
+    ddl_files = sorted(ddl_dir.glob("*.sql"))
+    if not ddl_files:
+        print(f"!! FAILED [0-1] DDL 파일을 찾을 수 없음: {ddl_dir}")
+        return 1
+    schema_sql = "\n".join(
+        f.read_text(encoding="utf-8") for f in ddl_files
+    )
 
     try:
         conn = psycopg2.connect(settings.db_dsn)
@@ -100,6 +103,7 @@ def main() -> int:
     print(SEP)
     print(">> START  [0-1] DB 스키마 생성")
     print(f"          host={settings.db_host}:{settings.db_port}  db={settings.db_name}")
+    print(f"          DDL 파일: {[f.name for f in ddl_files]}")
     print(SEP)
 
     try:

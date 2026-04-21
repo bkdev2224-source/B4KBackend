@@ -51,9 +51,19 @@ class RegionMapper:
             sources = [source_name] if source_name else list(self._index.keys())
             for src in sources:
                 mapping = self._index.get(src, {})
-                for raw_code, (region_code, ko) in mapping.items():
-                    cnt = self._update_region(conn, src, raw_code, ko)
-                    total += cnt
+                try:
+                    src_count = 0
+                    for raw_code, (region_code, ko) in mapping.items():
+                        src_count += self._update_region(conn, src, raw_code, ko)
+                    # FIX: commit after each source so a later error does not roll
+                    # back already-completed sources (mirrors DomainMapper pattern)
+                    conn.commit()
+                    if src_count:
+                        logger.info("Region 매핑 완료: %s (%d건)", src, src_count)
+                    total += src_count
+                except Exception as exc:
+                    conn.rollback()
+                    logger.error("RegionMapper 오류 (src=%s): %s", src, exc)
 
         logger.info("RegionMapper 완료: %d건 갱신", total)
         return total
@@ -68,10 +78,10 @@ class RegionMapper:
         cur = conn.cursor()
         cur.execute(
             """
-            UPDATE core.places
+            UPDATE core.poi
                SET display_region = %s
-             WHERE source_name = %s
-               AND region_code  = %s
+             WHERE source_ids ? %s
+               AND region_code    = %s
                AND (display_region IS DISTINCT FROM %s)
             """,
             (display_region, source_name, region_code, display_region),

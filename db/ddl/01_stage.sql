@@ -26,6 +26,9 @@ CREATE TABLE IF NOT EXISTS stage.api_keys (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE INDEX IF NOT EXISTS idx_api_keys_source
+    ON stage.api_keys(source_id);
+
 -- 소스별 언어별 동기화 상태 (체크포인트)
 CREATE TABLE IF NOT EXISTS stage.source_sync_state (
     id             SERIAL      PRIMARY KEY,
@@ -55,6 +58,9 @@ CREATE TABLE IF NOT EXISTS stage.sync_runs (
     error_message     TEXT
 );
 
+CREATE INDEX IF NOT EXISTS idx_sync_runs_source
+    ON stage.sync_runs(source_id);
+
 -- API에서 받은 원본 JSON 저장
 CREATE TABLE IF NOT EXISTS stage.raw_documents (
     id            BIGSERIAL    PRIMARY KEY,
@@ -70,5 +76,7 @@ CREATE TABLE IF NOT EXISTS stage.raw_documents (
 
 CREATE INDEX IF NOT EXISTS idx_raw_documents_source
     ON stage.raw_documents(source_id);
+CREATE INDEX IF NOT EXISTS idx_raw_documents_sync_run
+    ON stage.raw_documents(sync_run_id);
 CREATE INDEX IF NOT EXISTS idx_raw_documents_unprocessed
     ON stage.raw_documents(is_processed) WHERE is_processed = FALSE;

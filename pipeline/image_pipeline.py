@@ -26,6 +26,7 @@ cloudinary.config(
 
 MAX_RETRIES = 3
 BATCH_SIZE = 100
+_LOG_INTERVAL = 20  # 배치 내 진행 출력 간격
 
 
 class ImagePipeline:
@@ -37,15 +38,26 @@ class ImagePipeline:
 
     def run(self) -> dict[str, int]:
         results = {"uploaded": 0, "skipped": 0, "error": 0}
+        batch_num = 0
         with get_conn() as conn:
             while True:
                 rows = self._fetch_pending(conn)
                 if not rows:
+                    if batch_num == 0:
+                        logger.info("[1-5] 업로드 대기 이미지 없음")
                     break
-                for row in rows:
+                batch_num += 1
+                logger.info("[1-5] 배치 %d 시작: %d건 처리", batch_num, len(rows))
+                for idx, row in enumerate(rows):
                     outcome = self._process(conn, row)
                     results[outcome] += 1
-        logger.info("이미지 파이프라인 완료: %s", results)
+                    if (idx + 1) % _LOG_INTERVAL == 0:
+                        logger.info(
+                            "[1-5] 배치 %d: %d / %d 처리 중 | 업로드 %d | 스킵 %d | 오류 %d",
+                            batch_num, idx + 1, len(rows),
+                            results["uploaded"], results["skipped"], results["error"],
+                        )
+        logger.info("[1-5] 이미지 파이프라인 완료: %s", results)
         return results
 
     # ── 내부 ──────────────────────────────────────────────────────────────────
@@ -54,8 +66,8 @@ class ImagePipeline:
         cur = conn.cursor()
         cur.execute(
             """
-            SELECT id, place_id, original_url, error_count
-              FROM core.place_images
+            SELECT id, poi_id AS place_id, original_url, error_count
+              FROM core.poi_images
              WHERE upload_status = 'pending'
                AND error_count < %s
              LIMIT %s
@@ -81,20 +93,29 @@ class ImagePipeline:
             )
             cdn_url = result["secure_url"]
             self._mark_uploaded(conn, row["id"], cdn_url, public_id, result.get("width"), result.get("height"))
+            logger.debug("[1-5] 업로드 성공 (image_id=%s, place_id=%s)", row["id"], row["place_id"])
             return "uploaded"
 
         except cloudinary.exceptions.Error as e:
             if "already exists" in str(e).lower():
-                # public_id 중복 → 기존 URL 사용
                 existing_url = f"https://res.cloudinary.com/{settings.cloudinary_cloud_name}/image/upload/kculture/places/{public_id}.webp"
                 self._mark_uploaded(conn, row["id"], existing_url, public_id, 400, 300)
+                logger.debug("[1-5] public_id 중복 → 기존 URL 재사용 (image_id=%s)", row["id"])
                 return "skipped"
-            self._mark_error(conn, row["id"], row["error_count"] + 1)
-            logger.warning("Cloudinary 업로드 실패 (image_id=%s): %s", row["id"], e)
+            new_err_cnt = row["error_count"] + 1
+            self._mark_error(conn, row["id"], new_err_cnt)
+            logger.warning(
+                "[1-5] Cloudinary 업로드 실패 (image_id=%s, place_id=%s, retry=%d/%d): %s",
+                row["id"], row["place_id"], new_err_cnt, MAX_RETRIES, e,
+            )
             return "error"
         except Exception as exc:
-            self._mark_error(conn, row["id"], row["error_count"] + 1)
-            logger.error("이미지 처리 오류 (image_id=%s): %s", row["id"], exc)
+            new_err_cnt = row["error_count"] + 1
+            self._mark_error(conn, row["id"], new_err_cnt)
+            logger.error(
+                "[1-5] 이미지 처리 오류 (image_id=%s, place_id=%s, retry=%d/%d): %s",
+                row["id"], row["place_id"], new_err_cnt, MAX_RETRIES, exc,
+            )
             return "error"
 
     @staticmethod
@@ -107,15 +128,15 @@ class ImagePipeline:
         cur = conn.cursor()
         cur.execute(
             """
-            UPDATE core.place_images
-               SET cloudinary_url = %s,
-                   public_id      = %s,
-                   width          = %s,
-                   height         = %s,
-                   upload_status  = 'uploaded'
+            UPDATE core.poi_images
+               SET cloudinary_public_id = %s,
+                   secure_url           = %s,
+                   width                = %s,
+                   height               = %s,
+                   upload_status        = 'uploaded'
              WHERE id = %s
             """,
-            (cdn_url, public_id, w, h, img_id),
+            (public_id, cdn_url, w, h, img_id),
         )
 
     @staticmethod
@@ -123,6 +144,6 @@ class ImagePipeline:
         cur = conn.cursor()
         new_status = "error" if error_count >= MAX_RETRIES else "pending"
         cur.execute(
-            "UPDATE core.place_images SET error_count=%s, upload_status=%s WHERE id=%s",
+            "UPDATE core.poi_images SET error_count=%s, upload_status=%s WHERE id=%s",
             (error_count, new_status, img_id),
         )

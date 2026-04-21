@@ -13,14 +13,20 @@ CREATE TABLE IF NOT EXISTS core.supported_languages (
 );
 
 -- K-culture 태그
+-- category 예시: 'kfood', 'kfashion', 'kbeauty_product', 'ktourism', 'kcultural'
+-- parent_tag_id 로 계층 구성 가능 (한식 → 분식 → 떡볶이)
 CREATE TABLE IF NOT EXISTS core.k_culture_tags (
-    id         SERIAL       PRIMARY KEY,
-    slug       VARCHAR(100) NOT NULL UNIQUE,
-    name_ko    VARCHAR(200) NOT NULL,
-    name_en    VARCHAR(200),
-    category   VARCHAR(50),
-    created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    id             SERIAL       PRIMARY KEY,
+    slug           VARCHAR(100) NOT NULL UNIQUE,
+    name_ko        VARCHAR(200) NOT NULL,
+    name_en        VARCHAR(200),
+    category       VARCHAR(50),
+    parent_tag_id  INTEGER      REFERENCES core.k_culture_tags(id) ON DELETE SET NULL,
+    created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_k_culture_tags_parent
+    ON core.k_culture_tags(parent_tag_id);
 
 -- 건물 (POI 상위 컨테이너, 선택적)
 CREATE TABLE IF NOT EXISTS core.buildings (
@@ -37,14 +43,17 @@ CREATE INDEX IF NOT EXISTS idx_buildings_geom
 -- POI 마스터
 CREATE TABLE IF NOT EXISTS core.poi (
     id              BIGSERIAL    PRIMARY KEY,
-    source_ids      JSONB        NOT NULL DEFAULT '{}',
+    source_ids      JSONB        NOT NULL DEFAULT '{}',  -- {"tourapi":"123", "mois":"456"}
     name_ko         VARCHAR(500) NOT NULL,
     address_ko      TEXT,
     geom            GEOMETRY(Point, 4326),
-    category_code   VARCHAR(50),
-    content_type_id VARCHAR(20),
+    category_code   VARCHAR(50),    -- 소스 원본 카테고리 코드 (tourapi cat1~3, mois 업태구분명)
+    content_type_id VARCHAR(20),    -- TourAPI contenttypeid (12,14,25,28,32,38,39,75,76)
+    region_code     VARCHAR(20),    -- 지역 코드 (tourapi areacode, mois 행정구역코드)
     phone           VARCHAR(100),
     homepage        TEXT,
+    display_domain  VARCHAR(50),    -- kfood|kbeauty|ktourism|kshopping|kleisure 등
+    display_region  VARCHAR(100),   -- 서울|부산|제주 등 한국어 지역명
     quality         VARCHAR(20)  NOT NULL DEFAULT 'missing'
                     CHECK (quality IN ('full', 'partial', 'missing')),
     is_active       BOOLEAN      NOT NULL DEFAULT TRUE,
@@ -73,7 +82,7 @@ CREATE TABLE IF NOT EXISTS core.poi_translations (
     address       TEXT,
     description   TEXT,
     source        VARCHAR(20) NOT NULL DEFAULT 'api'
-                  CHECK (source IN ('api', 'gpt', 'gpt-4.1-mini')),
+                  CHECK (source IN ('api', 'gpt', 'gpt-4.1-mini', 'deepseek', 'gemini', 'juso')),
     needs_review  BOOLEAN     NOT NULL DEFAULT FALSE,
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (poi_id, language_code)
@@ -95,6 +104,9 @@ CREATE TABLE IF NOT EXISTS core.poi_images (
     height               INTEGER,
     format               VARCHAR(20),
     is_primary           BOOLEAN     NOT NULL DEFAULT FALSE,
+    upload_status        VARCHAR(20) NOT NULL DEFAULT 'pending'
+                         CHECK (upload_status IN ('pending', 'uploaded', 'error', 'skipped')),
+    error_count          INTEGER     NOT NULL DEFAULT 0,
     created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -139,9 +151,18 @@ CREATE TABLE IF NOT EXISTS core.translation_fill_queue (
     language_code VARCHAR(10) NOT NULL REFERENCES core.supported_languages(code),
     field         VARCHAR(50) NOT NULL,
     priority      INTEGER     NOT NULL DEFAULT 5,
+    status        VARCHAR(20) NOT NULL DEFAULT 'pending'
+                  CHECK (status IN ('pending', 'completed', 'error')),
+    provider      VARCHAR(20),
+    is_retranslation BOOLEAN  NOT NULL DEFAULT FALSE,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (poi_id, language_code, field)
 );
+
+CREATE INDEX IF NOT EXISTS idx_translation_fill_queue_pending
+    ON core.translation_fill_queue(language_code)
+    WHERE status = 'pending';
 
 -- 중복 검토 대기열
 CREATE TABLE IF NOT EXISTS core.dedup_review_queue (
@@ -156,6 +177,13 @@ CREATE TABLE IF NOT EXISTS core.dedup_review_queue (
     reviewed_at     TIMESTAMPTZ
 );
 
+CREATE INDEX IF NOT EXISTS idx_dedup_review_queue_poi_a
+    ON core.dedup_review_queue(poi_id_a);
+CREATE INDEX IF NOT EXISTS idx_dedup_review_queue_poi_b
+    ON core.dedup_review_queue(poi_id_b);
+CREATE INDEX IF NOT EXISTS idx_dedup_review_queue_status
+    ON core.dedup_review_queue(status) WHERE status = 'pending';
+
 -- 동기화 로그
 CREATE TABLE IF NOT EXISTS core.sync_log (
     id           BIGSERIAL   PRIMARY KEY,
@@ -166,3 +194,6 @@ CREATE TABLE IF NOT EXISTS core.sync_log (
     errors       INTEGER     NOT NULL DEFAULT 0,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_sync_log_sync_run
+    ON core.sync_log(sync_run_id);

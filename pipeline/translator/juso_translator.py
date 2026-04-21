@@ -50,20 +50,20 @@ class JusoAddressTranslator:
     # ── 내부 ──────────────────────────────────────────────────────────────────
 
     def _fetch_pending(self) -> list[dict]:
-        """영문 주소가 없는 place 목록 조회."""
+        """영문 주소가 없는 poi 목록 조회."""
         with get_conn() as conn:
             cur = conn.cursor()
             cur.execute(
                 """
-                SELECT p.place_id, p.address
-                  FROM core.places p
-                 WHERE p.address IS NOT NULL
+                SELECT p.id AS place_id, p.address_ko AS address
+                  FROM core.poi p
+                 WHERE p.address_ko IS NOT NULL
                    AND p.is_active = TRUE
                    AND NOT EXISTS (
                        SELECT 1
-                         FROM core.place_translations t
-                        WHERE t.place_id = p.place_id
-                          AND t.lang = 'en'
+                         FROM core.poi_translations t
+                        WHERE t.poi_id = p.id
+                          AND t.language_code = 'en'
                           AND t.address IS NOT NULL
                    )
                  LIMIT %s
@@ -104,12 +104,12 @@ class JusoAddressTranslator:
             cur = conn.cursor()
             cur.execute(
                 """
-                INSERT INTO core.place_translations (place_id, lang, address, model_used)
-                VALUES (%s, 'en', %s, 'juso_api')
-                ON CONFLICT (place_id, lang) DO UPDATE
-                  SET address       = EXCLUDED.address,
-                      model_used    = EXCLUDED.model_used,
-                      translated_at = now()
+                INSERT INTO core.poi_translations (poi_id, language_code, address, source)
+                VALUES (%s, 'en', %s, 'juso')
+                ON CONFLICT (poi_id, language_code) DO UPDATE
+                  SET address    = EXCLUDED.address,
+                      source     = EXCLUDED.source,
+                      updated_at = now()
                 """,
                 (place_id, en_address),
             )

@@ -1,6 +1,6 @@
 ---
 name: translator-expert
-description: B4KBackend 번역 전문가. 주소정보누리집/DeepSeek/Gemini 번역, 토큰 관리, 번역 규칙 DB, 다국어 번역 큐, place_translations, 번역 프롬프트 최적화 관련 작업 시 즉시 트리거. 키워드: 번역, translation, juso, deepseek, gemini, place_translations, 다국어, multilingual, 큐, pending, 주소번역, 도로명, 토큰, token, 규칙, rules, 브라질, pt-BR.
+description: B4KBackend 번역 전문가. 주소정보누리집/DeepSeek/Gemini 번역, 토큰 관리, 번역 규칙 DB, 다국어 번역 큐, place_translations, entity_translations, 번역 프롬프트 최적화 관련 작업 시 즉시 트리거. 키워드: 번역, translation, juso, deepseek, gemini, place_translations, entity_translations, entity_translation_queue, 다국어, multilingual, 큐, pending, 주소번역, 도로명, 토큰, token, 규칙, rules, 브라질, pt-BR, 엔티티번역.
 ---
 
 # 번역 전문가
@@ -108,16 +108,24 @@ VALUES ('term', 'en', 'Translate 떡볶이 as "tteokbokki" (not "rice cake stir-
 ## 번역 파이프라인 전체 흐름
 
 ```
-TranslationOrchestrator.run()
-  ① JusoAddressTranslator  — 주소 한→영 (순차, place당 1 API call)
-  ② DeepSeekTranslator     — zh-CN/zh-TW (청크 병렬)
-  ③ GeminiBatchTranslator  — en/ja/th/pt-BR (청크 병렬)
-  ④ DB 트리거              — places_snapshot 자동 갱신
+TranslationOrchestrator.run()  → {"address_en": N, "deepseek": N, "gemini": N, "entities": N}
+  ① JusoAddressTranslator   — 주소 한→영 (순차, place당 1 API call)
+  ② DeepSeekTranslator      — zh-CN/zh-TW place 번역 (청크 병렬)
+  ③ GeminiBatchTranslator   — en/ja/th/pt-BR place 번역 (청크 병렬)
+  ④ EntityTranslationRunner — 엔티티 번역 DeepSeek+Gemini (청크 병렬)
+  ⑤ DB 트리거               — places_snapshot 자동 갱신
 ```
+
+**EntityTranslationRunner** (`batch_translator.py` 내 정의):
+- `core.entity_translation_queue` (status='pending') → `core.entity_translations`
+- 소스 필드: `core.entities.canonical_name` + `description_ko`
+- 키: `entity_id` (place_id 대신)
+- 저장 테이블: `core.entity_translations (entity_id, language_code)`
+- provider 결정: zh-CN/zh-TW → DeepSeek, 나머지 → Gemini
 
 ## 스키마 핵심 사항
 
-**`service.places_snapshot` 언어 컬럼:**
+**`service.places_snapshot` 언어 컬럼 (POI):**
 ```
 name_ko, name_en, name_ja, name_zh_cn, name_zh_tw, name_th, name_pt_br
 address_ko, address_en   ← 주소는 ko+en만
@@ -125,9 +133,18 @@ description_ko, description_en, description_ja,
 description_zh_cn, description_zh_tw, description_th, description_pt_br
 ```
 
-**`core.translation_fill_queue`:**
+**`core.translation_fill_queue` (POI):**
 - `provider`: 'gemini' | 'deepseek'
 - `job_id`: 청크 단위 배치 ID (현재 미사용)
+
+**`core.entity_translation_queue` (엔티티):**
+- 구조: `(entity_id, language_code)` UNIQUE
+- `provider`: 'gemini' | 'deepseek'
+- status: 'pending' → 'submitted' → 'completed' | 'error'
+
+**`core.entity_translations` (엔티티):**
+- `(entity_id, language_code)` UNIQUE
+- `name`, `description`, `model_used`, `is_retranslation`
 
 ## 작업 시작 시 읽을 파일
 

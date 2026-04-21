@@ -84,10 +84,62 @@ Supabase Auth를 사용한다 (JWT 직접 구현 불필요).
 - `auth.uid()` — RLS 정책에서 현재 로그인 유저 ID 참조
 - `"user".users` 테이블과 `auth.users` (Supabase 내장) 연동 고려
 
+## 엔티티 노출 (API 관점)
+
+`core.entities`와 관련 테이블(`entity_aliases`, `entity_sns`, `entity_images`, `entity_translations`)은 현재 **노출 스키마에 포함되지 않는다** (core 스키마는 ETL 전용).
+
+엔티티를 프론트엔드/챗봇에 노출하려면:
+1. `service` 스키마에 엔티티 스냅샷 뷰 또는 테이블 추가
+2. 또는 RPC 함수로 JOIN 결과 반환
+
+### 엔티티 검색 RPC 예시
+
+```sql
+-- 챗봇이 엔티티 연관 POI를 찾을 때 호출
+CREATE OR REPLACE FUNCTION match_entities(
+  query_embedding vector(1536),
+  match_count     int DEFAULT 5,
+  entity_type_filter text DEFAULT NULL
+)
+RETURNS TABLE (
+  entity_id   int,
+  canonical_name text,
+  entity_type text,
+  similarity  float
+)
+LANGUAGE sql AS $$
+  SELECT e.id, e.canonical_name, e.entity_type,
+         1 - (ei.embedding <=> query_embedding) AS similarity
+    FROM core.entities e
+    JOIN service.search_index ei ON ei.entity_id = e.id
+   WHERE e.is_active = TRUE
+     AND (entity_type_filter IS NULL OR e.entity_type = entity_type_filter)
+   ORDER BY ei.embedding <=> query_embedding
+   LIMIT match_count;
+$$;
+
+-- 특정 엔티티와 연결된 POI 조회
+CREATE OR REPLACE FUNCTION get_entity_pois(p_entity_id int)
+RETURNS TABLE (
+  place_id bigint, name text, address text,
+  relation text, display_domain text
+)
+LANGUAGE sql AS $$
+  SELECT ps.place_id, ps.name_ko, ps.address_ko,
+         pem.relation, ps.display_domain
+    FROM core.poi_entity_map pem
+    JOIN service.places_snapshot ps ON ps.place_id = pem.poi_id
+   WHERE pem.entity_id = p_entity_id
+     AND ps.is_publishable = TRUE
+   ORDER BY ps.name_ko;
+$$;
+```
+
 ## 작업 시작 시 읽을 파일
 
 ```
-database/schema.sql   (service.*, user.*, ai.* 섹션)
+database/schema.sql    (service.*, user.*, ai.* 섹션)
+db/ddl/05_entities.sql (엔티티 구조 확인 시)
 ```
 RLS 정책과 DB 함수는 schema.sql 또는 별도 `database/rls.sql`, `database/functions.sql`에 관리한다.
 
@@ -99,6 +151,8 @@ RLS 정책과 DB 함수는 schema.sql 또는 별도 `database/rls.sql`, `databas
 4. **places_snapshot 다국어 필터** — lang 파라미터 처리를 DB 함수나 뷰로 추상화.
 5. **api/ 디렉토리 정리** — 현재 FastAPI 코드(api/main.py, api/routes/)가 남아있음. 제거 대상.
 6. **챗봇 service role key 관리** — 챗봇 레포에서 service role key 사용 시 서버사이드에서만 사용 (클라이언트 노출 금지).
+7. **엔티티 서비스 뷰** — `core.entities`를 service 스키마로 노출하는 뷰/스냅샷 테이블 미작성. `match_entities`, `get_entity_pois` RPC 함수 추가 필요.
+8. **poi_entity_map 노출** — 특정 POI와 연관된 아티스트/브랜드 목록 조회 RPC 부재.
 
 ## 응답 스타일
 

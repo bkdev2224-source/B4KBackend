@@ -112,11 +112,13 @@ class MoisCollector:
                         new_cnt += 1
                     else:
                         mod_cnt += 1
-                    if total % 1_000 == 0:
-                        logger.info(
-                            "[2-1] %d행 처리 중 | 신규 %d | 변경 %d | 스킵(비영업) %d",
-                            total, new_cnt, mod_cnt, skip_cnt,
-                        )
+                # 배치 단위로 커밋 — 대용량 파일에서 트랜잭션이 무한히 커지는 것 방지
+                conn.commit()
+                if total % 1_000 == 0 or total == 0:
+                    logger.info(
+                        "[2-1] %d행 처리 중 | 신규 %d | 변경 %d | 스킵(비영업) %d",
+                        total, new_cnt, mod_cnt, skip_cnt,
+                    )
 
             self._update_sync_run(conn, run_id, "success", new_cnt, mod_cnt, 0)
             self._update_sync_state(conn, run_id)
@@ -130,12 +132,17 @@ class MoisCollector:
     def run_incremental(self, csv_path: str | Path, since: datetime) -> int:
         """증분 수집 — since 이후 최종수정시점 행만 처리."""
         csv_path = Path(csv_path)
+        logger.info(
+            "MOIS CSV 증분 수집 시작: %s (since=%s)",
+            csv_path.name, since.strftime("%Y-%m-%d %H:%M:%S"),
+        )
         run_id = self._create_sync_run("incremental")
-        new_cnt = mod_cnt = skip_cnt = 0
+        new_cnt = mod_cnt = skip_cnt = total = 0
 
         with get_conn() as conn:
             for batch in self._csv_batches(csv_path, since=since):
                 for row in batch:
+                    total += 1
                     if not self._is_open(row):
                         skip_cnt += 1
                         continue
@@ -145,12 +152,19 @@ class MoisCollector:
                         new_cnt += 1
                     else:
                         mod_cnt += 1
+                # 배치 단위로 커밋 — 대용량 파일에서 트랜잭션이 무한히 커지는 것 방지
+                conn.commit()
+                if total % 1_000 == 0 or total == 0:
+                    logger.info(
+                        "[2-1] 증분 %d행 처리 중 | 신규 %d | 변경 %d | 스킵(비영업) %d",
+                        total, new_cnt, mod_cnt, skip_cnt,
+                    )
 
             self._update_sync_run(conn, run_id, "success", new_cnt, mod_cnt, 0)
             self._update_sync_state(conn, run_id)
 
         logger.info(
-            "MOIS 증분 수집 완료: 신규 %d, 변경 %d, 건너뜀(비영업) %d",
+            "[2-1] 증분 수집 완료 | 신규 %d | 변경 %d | 스킵(비영업) %d",
             new_cnt, mod_cnt, skip_cnt,
         )
         return run_id
@@ -167,36 +181,43 @@ class MoisCollector:
         fh = None
         reader = None
 
+        detected_enc: str | None = None
         for enc in encodings:
             try:
+                logger.debug("[2-1] 인코딩 시도: %s (%s)", enc, csv_path.name)
                 fh = open(csv_path, encoding=enc, newline="")
                 reader = csv.DictReader(fh)
                 # 헤더 정규화 (공백·대소문자·알리아스)
                 raw_headers = reader.fieldnames or []
-                reader.fieldnames = [
-                    _alias(h.strip()) for h in raw_headers
-                ]
-                # 첫 행 읽어 인코딩 검증
+                # 첫 행 읽어 인코딩 검증 (UnicodeDecodeError 여기서 터짐)
                 first = next(iter(reader), None)
+                # 핵심 컬럼 "사업장명"이 헤더에 없으면 인코딩 불일치로 간주
                 if first is not None and "사업장명" not in raw_headers:
-                    # 컬럼이 전혀 없으면 인코딩 실패로 간주
-                    pass
+                    logger.debug("[2-1] 헤더에 '사업장명' 없음 → 인코딩 불일치: %s", enc)
+                    fh.close()
+                    fh = None
+                    continue
+                detected_enc = enc
+                logger.debug("[2-1] 인코딩 확정: %s", enc)
                 break
             except (UnicodeDecodeError, StopIteration):
+                logger.debug("[2-1] 인코딩 실패: %s, 다음 시도...", enc)
                 if fh:
                     fh.close()
                 fh = None
 
-        if fh is None or reader is None:
+        if fh is None or reader is None or detected_enc is None:
+            logger.error("[2-1] CSV 인코딩 감지 실패 (시도: %s): %s", encodings, csv_path)
             raise ValueError(f"CSV 인코딩 감지 실패: {csv_path}")
 
         try:
             batch: list[dict] = []
-            # first row already consumed — reset
+            # 인코딩 검증 시 소비된 첫 행을 복구하기 위해 파일 처음으로 되감음.
+            # seek(0) 후 DictReader를 새로 만들면 헤더를 자동으로 다시 읽으므로
+            # next(reader) 로 헤더를 수동으로 건너뛸 필요 없음.
             fh.seek(0)
             reader = csv.DictReader(fh)
             reader.fieldnames = [_alias(h.strip()) for h in (reader.fieldnames or [])]
-            next(reader)  # skip header row
 
             for row in reader:
                 row = {k: (v.strip() if v else None) for k, v in row.items()}
@@ -264,8 +285,12 @@ class MoisCollector:
                 lat, lng = float(lat_str), float(lng_str)
                 if 33.0 <= lat <= 38.9 and 124.0 <= lng <= 132.0:
                     return {"lat": lat, "lng": lng, "coord_crs": "WGS84"}
-            except (ValueError, TypeError):
-                pass
+                logger.debug(
+                    "[2-1] WGS84 범위 초과 (lat=%.5f, lng=%.5f), TM 변환 시도",
+                    lat, lng,
+                )
+            except (ValueError, TypeError) as e:
+                logger.debug("[2-1] WGS84 좌표 파싱 오류 (lat=%s, lng=%s): %s", lat_str, lng_str, e)
 
         # EPSG:5174 TM 좌표 변환
         x_str = row.get("coord_x") or row.get("좌표정보(x)")
@@ -282,61 +307,88 @@ class MoisCollector:
                             "lng": round(lng, 7),
                             "coord_crs": "EPSG:5174→WGS84",
                         }
+                    logger.debug(
+                        "[2-1] TM 변환 후 WGS84 범위 초과 (lat=%.5f, lng=%.5f)",
+                        lat, lng,
+                    )
+                else:
+                    logger.debug("[2-1] TM 좌표 범위 초과 → 좌표 없음 (x=%s, y=%s)", x_str, y_str)
             except Exception as exc:
-                logger.debug("좌표 변환 실패 (x=%s y=%s): %s", x_str, y_str, exc)
+                logger.debug("[2-1] 좌표 변환 실패 (x=%s, y=%s): %s", x_str, y_str, exc)
 
         return {}
 
+    def _get_source_id(self, conn) -> int:
+        """stage.api_sources에서 source name으로 정수 ID 반환. 없으면 자동 등록."""
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM stage.api_sources WHERE name = %s", (self.SOURCE_NAME,))
+        row = cur.fetchone()
+        if row:
+            return row["id"]
+        cur.execute(
+            "INSERT INTO stage.api_sources (name, display_name) VALUES (%s, %s) RETURNING id",
+            (self.SOURCE_NAME, self.SOURCE_NAME),
+        )
+        conn.commit()
+        return cur.fetchone()["id"]
+
     def _upsert(self, conn, data: dict) -> bool:
         """stage.raw_documents upsert. True=신규, False=변경."""
-        source_id = data.get("source_id") or ""
-        if not source_id:
+        external_id = str(data.get("source_id") or "").strip()
+        if not external_id:
+            logger.warning("[2-1] 관리번호(source_id) 없음 → 스킵 (name=%s)", data.get("name"))
             return False
 
+        api_source_id = self._get_source_id(conn)
         cur = conn.cursor()
         cur.execute(
             """
-            INSERT INTO stage.raw_documents (source_name, source_id, raw_data, sync_status, collected_at)
-            VALUES (%s, %s, %s, 'new', now())
-            ON CONFLICT (source_name, source_id) DO UPDATE
-              SET raw_data     = EXCLUDED.raw_data,
-                  sync_status  = CASE
-                                   WHEN stage.raw_documents.raw_data = EXCLUDED.raw_data
-                                   THEN stage.raw_documents.sync_status
-                                   ELSE 'modified'
+            INSERT INTO stage.raw_documents
+                (source_id, external_id, raw_json, is_processed, collected_at)
+            VALUES (%s, %s, %s, FALSE, now())
+            ON CONFLICT (source_id, external_id, language_code) DO UPDATE
+              SET raw_json     = EXCLUDED.raw_json,
+                  is_processed = CASE
+                                   WHEN stage.raw_documents.raw_json = EXCLUDED.raw_json
+                                   THEN stage.raw_documents.is_processed
+                                   ELSE FALSE
                                  END,
                   collected_at = now()
             RETURNING (xmax = 0) AS is_insert
             """,
-            (self.SOURCE_NAME, source_id, json.dumps(data, ensure_ascii=False)),
+            (api_source_id, external_id, json.dumps(data, ensure_ascii=False)),
         )
         result = cur.fetchone()
         return bool(result and result["is_insert"])
 
     def _create_sync_run(self, run_type: str) -> int:
+        _type_map = {"full": "full_load", "incremental": "fetch_updated"}
+        db_run_type = _type_map.get(run_type, run_type)
         with get_conn() as conn:
+            source_id = self._get_source_id(conn)
             cur = conn.cursor()
             cur.execute(
                 """
-                INSERT INTO stage.sync_runs (source_name, run_type, status)
+                INSERT INTO stage.sync_runs (source_id, run_type, status)
                 VALUES (%s, %s, 'running') RETURNING id
                 """,
-                (self.SOURCE_NAME, run_type),
+                (source_id, db_run_type),
             )
+            conn.commit()
             return cur.fetchone()["id"]
 
     def _update_sync_run(
-        self, conn, run_id: int, status: str, new_cnt: int, mod_cnt: int, del_cnt: int
+        self, conn, run_id: int, status: str, new_cnt: int, mod_cnt: int, del_cnt: int = 0
     ) -> None:
         cur = conn.cursor()
         cur.execute(
             """
             UPDATE stage.sync_runs
                SET status = %s, finished_at = now(),
-                   new_count = %s, modified_count = %s, deleted_count = %s
+                   records_collected = %s
              WHERE id = %s
             """,
-            (status, new_cnt, mod_cnt, del_cnt, run_id),
+            (status, new_cnt + mod_cnt, run_id),
         )
 
     def _update_sync_state(self, conn, run_id: int) -> None:
@@ -344,8 +396,8 @@ class MoisCollector:
         cur.execute(
             """
             UPDATE stage.source_sync_state
-               SET last_synced_at = now(), last_run_id = %s
-             WHERE source_name = %s
+               SET last_synced_at = now()
+             WHERE source_id = (SELECT id FROM stage.api_sources WHERE name = %s)
             """,
-            (run_id, self.SOURCE_NAME),
+            (self.SOURCE_NAME,),
         )

@@ -62,6 +62,13 @@ pipeline/dedup/ensemble.py
 6. **대용량 성능** — 후보 추출 후 앙상블 스코어를 Python에서 계산. 후보가 많을 때 병목 가능.
 7. **동명이소 처리** — 같은 이름, 같은 위치의 다른 장소 (예: 복합몰 내 여러 가게).
 
+## 현재 로깅 수준 (완료)
+
+- 시작 시: `"[2-4] Dedup 시작 (source=X): N건"` (INFO)
+- 매 100건: `"N / total 처리 중 | 병합 N | 검토 N | 신규 N"` (INFO)
+- 분기별: 좌표없음·공간후보없음·자동병합score·유사도낮음 (DEBUG)
+- 종료 시: 최종 집계 (INFO)
+
 ## 응답 스타일
 
 - 임계값 변경 제안 시 반드시 trade-off (false positive vs false negative) 명시

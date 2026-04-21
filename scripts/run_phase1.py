@@ -66,18 +66,20 @@ def main() -> int:
     parser.add_argument("--csv",       help="관광정보 CSV 경로")
     parser.add_argument("--sync",      action="store_true", help="TourAPI sync (areaBasedSyncList2)")
     parser.add_argument("--normalize", action="store_true", help="stage → core 정규화")
-    parser.add_argument("--translate", action="store_true", help="번역 실행 (Juso+DeepSeek+Gemini)")
-    parser.add_argument("--images",    action="store_true", help="Cloudinary 이미지 업로드")
+    parser.add_argument("--translate", action="store_true", help="번역 큐 제출 (1-7a: Juso+DeepSeek+Gemini)")
+    parser.add_argument("--collect",   action="store_true", help="번역 결과 수거 (1-7b)")
+    parser.add_argument("--images",    action="store_true", help="Cloudinary 이미지 업로드 (1-5, normalize 이후)")
     parser.add_argument("--all",       action="store_true", help="전체 실행")
     args = parser.parse_args()
 
     if args.all:
         args.sync      = True
         args.normalize = True
-        args.translate = True
         args.images    = True
+        args.translate = True
+        args.collect   = True
 
-    if not any([args.csv, args.sync, args.normalize, args.translate, args.images]):
+    if not any([args.csv, args.sync, args.normalize, args.images, args.translate, args.collect]):
         parser.print_help()
         return 0
 
@@ -141,23 +143,7 @@ def main() -> int:
             return step_fail(tag, exc)
 
     # ──────────────────────────────────────────────────────────────
-    # [1-7] 번역 실행
-    #   ① 주소(한→영): 주소정보누리집 API
-    #   ② zh-CN/zh-TW: DeepSeek
-    #   ③ en/ja/th   : Gemini
-    # ──────────────────────────────────────────────────────────────
-    if args.translate:
-        tag = "1-7"
-        step_start(tag, "번역 (Juso주소 + DeepSeek zh + Gemini en/ja/th)")
-        try:
-            from pipeline.translator.batch_translator import TranslationOrchestrator
-            result = TranslationOrchestrator().run()
-            step_ok(tag, f"주소={result['address_en']} DeepSeek={result['deepseek']} Gemini={result['gemini']}")
-        except Exception as exc:
-            return step_fail(tag, exc)
-
-    # ──────────────────────────────────────────────────────────────
-    # [1-5] 이미지 업로드
+    # [1-5] 이미지 업로드  (normalize 이후, translate 이전)
     # ──────────────────────────────────────────────────────────────
     if args.images:
         tag = "1-5"
@@ -166,6 +152,35 @@ def main() -> int:
             from pipeline.image_pipeline import ImagePipeline
             result = ImagePipeline().run()
             step_ok(tag, f"업로드 {result.get('uploaded', 0)}, 스킵 {result.get('skipped', 0)}, 에러 {result.get('error', 0)}")
+        except Exception as exc:
+            return step_fail(tag, exc)
+
+    # ──────────────────────────────────────────────────────────────
+    # [1-7a] 번역 큐 제출
+    #   ① 주소(한→영): 주소정보누리집 API
+    #   ② zh-CN/zh-TW: DeepSeek
+    #   ③ en/ja/th   : Gemini
+    # ──────────────────────────────────────────────────────────────
+    if args.translate:
+        tag = "1-7a"
+        step_start(tag, "번역 큐 제출 (Juso주소 + DeepSeek zh + Gemini en/ja/th)")
+        try:
+            from pipeline.translator.batch_translator import TranslationOrchestrator
+            result = TranslationOrchestrator().run()
+            step_ok(tag, f"주소={result['address_en']} DeepSeek={result['deepseek']} Gemini={result['gemini']}")
+        except Exception as exc:
+            return step_fail(tag, exc)
+
+    # ──────────────────────────────────────────────────────────────
+    # [1-7b] 번역 결과 수거
+    # ──────────────────────────────────────────────────────────────
+    if args.collect:
+        tag = "1-7b"
+        step_start(tag, "번역 결과 수거 → place_translations 저장")
+        try:
+            from pipeline.translator.batch_translator import BatchTranslator
+            cnt = BatchTranslator().collect()
+            step_ok(tag, f"{cnt}건 저장")
         except Exception as exc:
             return step_fail(tag, exc)
 

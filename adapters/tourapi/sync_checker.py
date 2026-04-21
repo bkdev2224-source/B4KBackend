@@ -59,29 +59,36 @@ class TourApiSyncChecker:
 
         new_cnt = mod_cnt = done = error_cnt = 0
 
-        for area_code in AREA_CODES:
-            for ct_id in CONTENT_TYPE_IDS:
-                done += 1
-                try:
-                    n, m = self._sync_area_type(area_code, ct_id, last_synced)
-                    new_cnt += n
-                    mod_cnt += m
-                    if n or m:
-                        logger.info(
-                            "[1-2] area=%2d ct=%2d | 신규 %d | 변경 %d  (%d/%d)",
-                            area_code, ct_id, n, m, done, total_tasks,
+        try:
+            for area_code in AREA_CODES:
+                for ct_id in CONTENT_TYPE_IDS:
+                    done += 1
+                    try:
+                        n, m = self._sync_area_type(area_code, ct_id, last_synced)
+                        new_cnt += n
+                        mod_cnt += m
+                        if n or m:
+                            logger.info(
+                                "[1-2] area=%2d ct=%2d | 신규 %d | 변경 %d  (%d/%d)",
+                                area_code, ct_id, n, m, done, total_tasks,
+                            )
+                        time.sleep(0.1)
+                    except Exception as exc:
+                        error_cnt += 1
+                        logger.error(
+                            "[1-2] 실패 area=%d ct=%d (%d/%d): %s",
+                            area_code, ct_id, done, total_tasks, exc,
                         )
-                    time.sleep(0.1)
-                except Exception as exc:
-                    error_cnt += 1
-                    logger.error(
-                        "[1-2] 실패 area=%d ct=%d (%d/%d): %s",
-                        area_code, ct_id, done, total_tasks, exc,
-                    )
 
-        with get_conn() as conn:
-            self._update_sync_run(conn, run_id, "success", new_cnt, mod_cnt)
-            self._update_sync_state(conn, run_id)
+            final_status = "partial" if error_cnt else "success"
+            with get_conn() as conn:
+                self._update_sync_run(conn, run_id, final_status, new_cnt, mod_cnt)
+                self._update_sync_state(conn, run_id)
+        except Exception as fatal_exc:
+            logger.exception("[1-2] 치명적 오류 — sync_run failed로 기록: %s", fatal_exc)
+            with get_conn() as conn:
+                self._update_sync_run(conn, run_id, "failed", new_cnt, mod_cnt)
+            raise
 
         logger.info(
             "[1-2] 완료 | 신규 %d | 변경 %d | 오류 %d건 | run_id=%d",
@@ -196,30 +203,49 @@ class TourApiSyncChecker:
             
         return items
 
+    def _get_api_source_id(self, conn) -> int:
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM stage.api_sources WHERE name = %s", (self.SOURCE_NAME,))
+        row = cur.fetchone()
+        if row:
+            return row["id"]
+        cur.execute(
+            "INSERT INTO stage.api_sources (name, display_name) VALUES (%s, %s) RETURNING id",
+            (self.SOURCE_NAME, self.SOURCE_NAME),
+        )
+        conn.commit()
+        return cur.fetchone()["id"]
+
     def _upsert_raw(self, conn, item: dict[str, Any], status: str) -> None:
-        source_id = str(item.get("contentid", ""))
-        if not source_id:
+        external_id = str(item.get("contentid", "")).strip()
+        if not external_id:
             return
 
+        api_source_id = self._get_api_source_id(conn)
         cur = conn.cursor()
         cur.execute(
             """
-            INSERT INTO stage.raw_documents (source_name, source_id, raw_data, sync_status)
-            VALUES (%s, %s, %s, %s)
-            ON CONFLICT (source_name, source_id) DO UPDATE
-              SET raw_data     = EXCLUDED.raw_data,
-                  sync_status  = EXCLUDED.sync_status,
-                  collected_at = now(),
-                  processed_at = NULL
+            INSERT INTO stage.raw_documents
+                (source_id, external_id, raw_json, is_processed, collected_at)
+            VALUES (%s, %s, %s, FALSE, now())
+            ON CONFLICT (source_id, external_id, language_code) DO UPDATE
+              SET raw_json     = EXCLUDED.raw_json,
+                  is_processed = FALSE,
+                  collected_at = now()
             """,
-            (self.SOURCE_NAME, source_id, json.dumps(item, ensure_ascii=False), status),
+            (api_source_id, external_id, json.dumps(item, ensure_ascii=False)),
         )
 
     def _get_last_synced_at(self) -> datetime | None:
         with get_conn() as conn:
             cur = conn.cursor()
             cur.execute(
-                "SELECT last_synced_at FROM stage.source_sync_state WHERE source_name = %s",
+                """
+                SELECT ss.last_synced_at
+                  FROM stage.source_sync_state ss
+                  JOIN stage.api_sources s ON s.id = ss.source_id
+                 WHERE s.name = %s
+                """,
                 (self.SOURCE_NAME,),
             )
             row = cur.fetchone()
@@ -227,14 +253,16 @@ class TourApiSyncChecker:
 
     def _create_sync_run(self) -> int:
         with get_conn() as conn:
+            api_source_id = self._get_api_source_id(conn)
             cur = conn.cursor()
             cur.execute(
                 """
-                INSERT INTO stage.sync_runs (source_name, run_type, status)
-                VALUES (%s, 'incremental', 'running') RETURNING id
+                INSERT INTO stage.sync_runs (source_id, run_type, status)
+                VALUES (%s, 'fetch_updated', 'running') RETURNING id
                 """,
-                (self.SOURCE_NAME,),
+                (api_source_id,),
             )
+            conn.commit()
             return cur.fetchone()["id"]
 
     def _update_sync_run(self, conn, run_id: int, status: str, new_cnt: int, mod_cnt: int) -> None:
@@ -242,10 +270,11 @@ class TourApiSyncChecker:
         cur.execute(
             """
             UPDATE stage.sync_runs
-               SET status = %s, finished_at = now(), new_count = %s, modified_count = %s
+               SET status = %s, finished_at = now(),
+                   records_collected = %s
              WHERE id = %s
             """,
-            (status, new_cnt, mod_cnt, run_id),
+            (status, new_cnt + mod_cnt, run_id),
         )
 
     def _update_sync_state(self, conn, run_id: int) -> None:
@@ -253,8 +282,8 @@ class TourApiSyncChecker:
         cur.execute(
             """
             UPDATE stage.source_sync_state
-               SET last_synced_at = now(), last_run_id = %s
-             WHERE source_name = %s
+               SET last_synced_at = now()
+             WHERE source_id = (SELECT id FROM stage.api_sources WHERE name = %s)
             """,
-            (run_id, self.SOURCE_NAME),
+            (self.SOURCE_NAME,),
         )

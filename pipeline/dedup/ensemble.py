@@ -28,6 +28,8 @@ logger = logging.getLogger(__name__)
 # 소스 우선순위 (높을수록 우선)
 SOURCE_PRIORITY = {"tourapi": 3, "mcst": 2, "mois": 1, "crawl": 0}
 
+_LOG_INTERVAL = 100  # 진행 상황 출력 간격 (성능 영향 없음)
+
 
 class DedupEnsemble:
     """
@@ -39,8 +41,15 @@ class DedupEnsemble:
     def run(self, source_name: str) -> dict[str, int]:
         results = {"merged": 0, "review": 0, "inserted": 0}
         pending = self._fetch_unprocessed(source_name)
+        total = len(pending)
 
-        for raw in pending:
+        if not pending:
+            logger.info("[2-4] Dedup 대기 항목 없음 (source=%s)", source_name)
+            return results
+
+        logger.info("[2-4] Dedup 시작 (source=%s): %d건", source_name, total)
+
+        for i, raw in enumerate(pending):
             data = raw["raw_data"]
             lat  = self._safe_float(data.get("lat") or data.get("mapy"))
             lng  = self._safe_float(data.get("lng") or data.get("mapx"))
@@ -48,32 +57,49 @@ class DedupEnsemble:
 
             # Step 0: 좌표 없음 → 신규
             if not lat or not lng:
+                logger.debug("[2-4] 좌표 없음 → 신규 INSERT (source_id=%s)", raw["source_id"])
                 self._insert_new(raw, source_name)
                 results["inserted"] += 1
-                continue
 
-            # Step 1: 공간 필터
-            candidates = self._spatial_candidates(lat, lng)
-            if not candidates:
-                self._insert_new(raw, source_name)
-                results["inserted"] += 1
-                continue
-
-            # Step 2: 앙상블 스코어
-            best_score, best_candidate = self._score_candidates(name, candidates)
-
-            # Step 3: 분기
-            if best_score >= settings.dedup_auto_merge_threshold:
-                self._merge(raw, best_candidate, source_name)
-                results["merged"] += 1
-            elif best_score >= settings.dedup_review_threshold:
-                self._queue_review(raw, best_candidate, best_score, source_name)
-                results["review"] += 1
             else:
-                self._insert_new(raw, source_name)
-                results["inserted"] += 1
+                # Step 1: 공간 필터
+                candidates = self._spatial_candidates(lat, lng)
+                if not candidates:
+                    logger.debug("[2-4] 공간 후보 없음 → 신규 INSERT (source_id=%s)", raw["source_id"])
+                    self._insert_new(raw, source_name)
+                    results["inserted"] += 1
 
-        logger.info("Dedup 완료 (source=%s): %s", source_name, results)
+                else:
+                    # Step 2: 앙상블 스코어
+                    best_score, best_candidate = self._score_candidates(name, candidates)
+
+                    # Step 3: 분기
+                    if best_score >= settings.dedup_auto_merge_threshold:
+                        logger.debug(
+                            "[2-4] 자동 병합 score=%.3f (source_id=%s → place_id=%s)",
+                            best_score, raw["source_id"], best_candidate["place_id"],
+                        )
+                        self._merge(raw, best_candidate, source_name)
+                        results["merged"] += 1
+                    elif best_score >= settings.dedup_review_threshold:
+                        self._queue_review(raw, best_candidate, best_score, source_name)
+                        results["review"] += 1
+                    else:
+                        logger.debug(
+                            "[2-4] 유사도 낮음 score=%.3f → 신규 INSERT (source_id=%s)",
+                            best_score, raw["source_id"],
+                        )
+                        self._insert_new(raw, source_name)
+                        results["inserted"] += 1
+
+            completed = i + 1
+            if completed % _LOG_INTERVAL == 0:
+                logger.info(
+                    "[2-4] %d / %d 처리 중 | 병합 %d | 검토 %d | 신규 %d",
+                    completed, total, results["merged"], results["review"], results["inserted"],
+                )
+
+        logger.info("[2-4] Dedup 완료 (source=%s): %s", source_name, results)
         return results
 
     # ── 내부 ──────────────────────────────────────────────────────────────────
@@ -83,11 +109,12 @@ class DedupEnsemble:
             cur = conn.cursor()
             cur.execute(
                 """
-                SELECT id, source_name, source_id, raw_data, sync_status
-                  FROM stage.raw_documents
-                 WHERE source_name = %s
-                   AND sync_status IN ('new', 'modified')
-                   AND processed_at IS NULL
+                SELECT rd.id, s.name AS source_name, rd.external_id AS source_id,
+                       rd.raw_json AS raw_data
+                  FROM stage.raw_documents rd
+                  JOIN stage.api_sources s ON s.id = rd.source_id
+                 WHERE s.name = %s
+                   AND rd.is_processed = FALSE
                 """,
                 (source_name,),
             )
@@ -98,10 +125,10 @@ class DedupEnsemble:
             cur = conn.cursor()
             cur.execute(
                 """
-                SELECT place_id, name, source_name, coords
-                  FROM core.places
+                SELECT id AS place_id, name_ko AS name, source_ids
+                  FROM core.poi
                  WHERE ST_DWithin(
-                         coords,
+                         geom,
                          ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography,
                          %s
                        )
@@ -177,71 +204,69 @@ class DedupEnsemble:
         source_id = raw["source_id"]
         with get_conn() as conn:
             cur = conn.cursor()
-            # place_source_ids에 새 소스 연결
+            # source_ids JSONB에 새 소스 연결 (기존 값 유지하면서 키만 추가)
             cur.execute(
                 """
-                INSERT INTO core.place_source_ids (place_id, source_name, source_id)
-                VALUES (%s, %s, %s) ON CONFLICT DO NOTHING
+                UPDATE core.poi
+                   SET source_ids = source_ids || jsonb_build_object(%s, %s),
+                       updated_at = now()
+                 WHERE id = %s
                 """,
-                (place_id, source_name, source_id),
+                (source_name, source_id, place_id),
             )
             # 보완 필드 업데이트 (우선순위 낮은 소스는 빈 필드만 채움)
+            # candidate["source_ids"]는 JSONB dict — 가장 높은 우선순위 소스명을 추출
             data = raw["raw_data"]
-            if SOURCE_PRIORITY.get(source_name, 0) < SOURCE_PRIORITY.get(candidate["source_name"], 0):
+            existing_source_ids: dict = candidate.get("source_ids") or {}
+            existing_max_priority = max(
+                (SOURCE_PRIORITY.get(s, 0) for s in existing_source_ids),
+                default=0,
+            )
+            if SOURCE_PRIORITY.get(source_name, 0) < existing_max_priority:
                 cur.execute(
                     """
-                    UPDATE core.places
-                       SET phone       = COALESCE(phone,       %s),
-                           description = COALESCE(description, %s),
-                           updated_at  = now()
-                     WHERE place_id = %s
+                    UPDATE core.poi
+                       SET phone      = COALESCE(phone, %s),
+                           updated_at = now()
+                     WHERE id = %s
                     """,
-                    (data.get("phone"), data.get("description"), place_id),
+                    (data.get("phone"), place_id),
                 )
             cur.execute(
-                "UPDATE stage.raw_documents SET sync_status='processed', processed_at=now() WHERE id=%s",
+                "UPDATE stage.raw_documents SET is_processed = TRUE WHERE id = %s",
                 (raw["id"],),
             )
 
     def _queue_review(
         self, raw: dict, candidate: dict, score: float, source_name: str
     ) -> None:
-        import json as _json
-        review_meta = {
-            "candidate_place_id": candidate["place_id"],
-            "candidate_name":     candidate.get("name"),
-            "raw_source_name":    source_name,
-            "raw_source_id":      raw["source_id"],
-            "raw_name":           (raw["raw_data"].get("name") or raw["raw_data"].get("title") or ""),
-            "raw_address":        (raw["raw_data"].get("address") or raw["raw_data"].get("addr1") or ""),
-            "score":              round(score, 4),
-        }
+        poi_id_a = candidate["place_id"]  # 기존 POI
+        # raw_data에 대응하는 POI가 아직 없으므로 poi_id_b는 삽입 후 연결;
+        # 여기서는 검토 대기 레코드만 남기고 raw_document 상태를 유지한다.
         with get_conn() as conn:
             cur = conn.cursor()
             cur.execute(
                 """
-                UPDATE core.places
-                   SET dedup_status = 'review',
-                       dedup_review_meta = %s
-                 WHERE place_id = %s
+                INSERT INTO core.dedup_review_queue
+                       (poi_id_a, poi_id_b, name_similarity)
+                VALUES (%s, %s, %s)
+                ON CONFLICT DO NOTHING
                 """,
-                (_json.dumps(review_meta, ensure_ascii=False), candidate["place_id"]),
+                (poi_id_a, poi_id_a, round(score, 4)),
             )
-            cur.execute(
-                "UPDATE stage.raw_documents SET sync_status='review', processed_at=now() WHERE id=%s",
-                (raw["id"],),
-            )
+            # raw_document는 처리되지 않은 상태로 유지 (normalizer 재실행 대기)
+            # is_processed = FALSE 그대로 두고 별도 메타만 기록
         logger.info(
-            "Review 큐 등록: source_id=%s ↔ place_id=%s (score=%.3f)",
-            raw["source_id"], candidate["place_id"], score,
+            "Review 큐 등록: source_id=%s ↔ poi_id=%s (score=%.3f)",
+            raw["source_id"], poi_id_a, score,
         )
 
     def _insert_new(self, raw: dict, source_name: str) -> None:
-        """normalizer에 위임 — raw_status를 'new'로 되돌려 normalizer가 처리하게 함."""
+        """normalizer에 위임 — is_processed=FALSE 로 유지해 normalizer가 처리하게 함."""
         with get_conn() as conn:
             cur = conn.cursor()
             cur.execute(
-                "UPDATE stage.raw_documents SET sync_status='new', processed_at=NULL WHERE id=%s",
+                "UPDATE stage.raw_documents SET is_processed = FALSE WHERE id = %s",
                 (raw["id"],),
             )
 

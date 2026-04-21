@@ -146,6 +146,8 @@ CREATE TABLE IF NOT EXISTS core.place_source_ids (
     UNIQUE (source_name, source_id)
 );
 
+CREATE INDEX IF NOT EXISTS idx_place_source_ids_place ON core.place_source_ids (place_id);
+
 -- 번역
 -- address 컬럼은 lang='en' 행에만 값이 들어간다 (주소정보누리집 API 한→영 변환).
 -- 다른 언어(ja/zh-CN/zh-TW/th)는 도로명 주소를 번역하지 않으므로 address=NULL.
@@ -317,6 +319,8 @@ CREATE TABLE IF NOT EXISTS "user".bookmarks (
     UNIQUE (user_id, place_id)
 );
 
+CREATE INDEX IF NOT EXISTS idx_bookmarks_place ON "user".bookmarks (place_id);
+
 CREATE TABLE IF NOT EXISTS "user".reviews (
     id          BIGSERIAL PRIMARY KEY,
     user_id     BIGINT NOT NULL REFERENCES "user".users(user_id) ON DELETE CASCADE,
@@ -343,6 +347,8 @@ CREATE TABLE IF NOT EXISTS ai.chat_sessions (
     last_active  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE INDEX IF NOT EXISTS idx_chat_sessions_user ON ai.chat_sessions (user_id);
+
 CREATE TABLE IF NOT EXISTS ai.chat_messages (
     id          BIGSERIAL PRIMARY KEY,
     session_id  UUID NOT NULL REFERENCES ai.chat_sessions(session_id) ON DELETE CASCADE,
@@ -364,6 +370,9 @@ CREATE TABLE IF NOT EXISTS ai.itineraries (
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE INDEX IF NOT EXISTS idx_itineraries_user    ON ai.itineraries (user_id);
+CREATE INDEX IF NOT EXISTS idx_itineraries_session ON ai.itineraries (session_id);
+
 CREATE TABLE IF NOT EXISTS ai.itinerary_items (
     id             BIGSERIAL PRIMARY KEY,
     itinerary_id   BIGINT NOT NULL REFERENCES ai.itineraries(itinerary_id) ON DELETE CASCADE,
@@ -372,6 +381,9 @@ CREATE TABLE IF NOT EXISTS ai.itinerary_items (
     estimated_time TEXT,
     note           TEXT
 );
+
+CREATE INDEX IF NOT EXISTS idx_itinerary_items_itinerary ON ai.itinerary_items (itinerary_id);
+CREATE INDEX IF NOT EXISTS idx_itinerary_items_place     ON ai.itinerary_items (place_id);
 
 
 -- =============================================================================
@@ -447,6 +459,7 @@ BEGIN
         description_pt_br  = EXCLUDED.description_pt_br,
         display_domain     = EXCLUDED.display_domain,
         display_region     = EXCLUDED.display_region,
+        source_category    = EXCLUDED.source_category,
         quality_score      = EXCLUDED.quality_score,
         is_publishable     = EXCLUDED.is_publishable,
         primary_image_url  = EXCLUDED.primary_image_url,

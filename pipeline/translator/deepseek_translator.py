@@ -96,13 +96,17 @@ class DeepSeekTranslator:
             cur = conn.cursor()
             cur.execute(
                 """
-                SELECT q.id AS queue_id, q.place_id, q.lang, q.is_retranslation,
-                       p.name, p.description
+                SELECT q.id AS queue_id, q.poi_id AS place_id,
+                       q.language_code AS lang, q.is_retranslation,
+                       p.name_ko AS name,
+                       COALESCE(pt.description, '') AS description
                   FROM core.translation_fill_queue q
-                  JOIN core.places p ON p.place_id = q.place_id
+                  JOIN core.poi p ON p.id = q.poi_id
+                  LEFT JOIN core.poi_translations pt
+                         ON pt.poi_id = q.poi_id AND pt.language_code = 'ko'
                  WHERE q.status = 'pending'
-                   AND q.lang = ANY(%s)
-                 ORDER BY q.lang, q.id
+                   AND q.language_code = ANY(%s)
+                 ORDER BY q.language_code, q.id
                  LIMIT %s
                 """,
                 (list(_DEEPSEEK_LANGS), settings.translation_batch_size),
@@ -161,29 +165,28 @@ class DeepSeekTranslator:
         success = 0
         with get_conn() as conn:
             for row, translated in results:
+                cur = conn.cursor()
+                cur.execute("SAVEPOINT sp_place")
                 if not translated:
+                    cur.execute("RELEASE SAVEPOINT sp_place")
                     self._mark_error(conn, row["queue_id"])
                     continue
                 try:
-                    cur = conn.cursor()
                     cur.execute(
                         """
-                        INSERT INTO core.place_translations
-                            (place_id, lang, name, description, model_used, is_retranslation)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                        ON CONFLICT (place_id, lang) DO UPDATE
-                          SET name             = EXCLUDED.name,
-                              description      = EXCLUDED.description,
-                              model_used       = EXCLUDED.model_used,
-                              is_retranslation = EXCLUDED.is_retranslation,
-                              translated_at    = now()
+                        INSERT INTO core.poi_translations
+                            (poi_id, language_code, name, description, source)
+                        VALUES (%s, %s, %s, %s, 'deepseek')
+                        ON CONFLICT (poi_id, language_code) DO UPDATE
+                          SET name        = EXCLUDED.name,
+                              description = EXCLUDED.description,
+                              source      = EXCLUDED.source,
+                              updated_at  = now()
                         """,
                         (
                             row["place_id"], row["lang"],
                             translated.get("name"),
                             translated.get("description"),
-                            settings.deepseek_translation_model,
-                            row["is_retranslation"],
                         ),
                     )
                     cur.execute(
@@ -194,9 +197,12 @@ class DeepSeekTranslator:
                         """,
                         (row["queue_id"],),
                     )
+                    cur.execute("RELEASE SAVEPOINT sp_place")
                     success += 1
                 except Exception as exc:
                     logger.error("[DeepSeek] 저장 오류 place_id=%d: %s", row["place_id"], exc)
+                    cur.execute("ROLLBACK TO SAVEPOINT sp_place")
+                    cur.execute("RELEASE SAVEPOINT sp_place")
                     self._mark_error(conn, row["queue_id"])
         return success
 

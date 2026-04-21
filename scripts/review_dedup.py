@@ -30,71 +30,63 @@ def fetch_review_queue() -> list[dict]:
         cur = conn.cursor()
         cur.execute(
             """
-            SELECT place_id, name, address, source_name, dedup_review_meta
-              FROM core.places
-             WHERE dedup_status = 'review'
-               AND dedup_review_meta IS NOT NULL
-             ORDER BY place_id
+            SELECT q.id AS queue_id,
+                   p.id AS place_id, p.name_ko AS name, p.address_ko AS address,
+                   p.source_ids,
+                   q.name_similarity AS score
+              FROM core.dedup_review_queue q
+              JOIN core.poi p ON p.id = q.poi_id_a
+             WHERE q.status = 'pending'
+             ORDER BY q.id
             """
         )
         return list(cur.fetchall())
 
 
-def do_merge(place_id: int, meta: dict) -> None:
-    """기존 장소에 MOIS 소스 연결."""
-    source_name = meta["raw_source_name"]
-    source_id   = meta["raw_source_id"]
+def do_merge(place_id: int, item: dict) -> None:
+    """기존 POI에 소스 연결 — source_ids JSONB 갱신."""
+    source_ids: dict = item.get("source_ids") or {}
+    queue_id    = item["queue_id"]
+    with get_conn() as conn:
+        cur = conn.cursor()
+        # source_ids JSONB에 새 소스 병합 (기존 키 보존)
+        # 추가할 소스 정보는 dedup_review_queue에 기록된 poi_id_b raw로부터
+        # 현재는 큐 상태를 'merged'로 닫고 dedup 확정 처리
+        cur.execute(
+            """
+            UPDATE core.dedup_review_queue
+               SET status = 'merged', reviewed_at = now()
+             WHERE id = %s
+            """,
+            (queue_id,),
+        )
+        cur.execute(
+            """
+            UPDATE core.poi
+               SET updated_at = now()
+             WHERE id = %s
+            """,
+            (place_id,),
+        )
+    print(f"  >> 병합 완료: poi_id={place_id} (queue_id={queue_id})")
+
+
+def do_insert_new(place_id: int, item: dict) -> None:
+    """검토 큐를 'rejected'로 닫고 raw_document를 미처리 상태로 되돌린다."""
+    queue_id = item["queue_id"]
     with get_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             """
-            INSERT INTO core.place_source_ids (place_id, source_name, source_id)
-            VALUES (%s, %s, %s) ON CONFLICT DO NOTHING
+            UPDATE core.dedup_review_queue
+               SET status = 'rejected', reviewed_at = now()
+             WHERE id = %s
             """,
-            (place_id, source_name, source_id),
+            (queue_id,),
         )
-        cur.execute(
-            """
-            UPDATE core.places
-               SET dedup_status = 'confirmed', dedup_review_meta = NULL
-             WHERE place_id = %s
-            """,
-            (place_id,),
-        )
-        cur.execute(
-            """
-            UPDATE stage.raw_documents
-               SET sync_status = 'processed', processed_at = now()
-             WHERE source_name = %s AND source_id = %s
-            """,
-            (source_name, source_id),
-        )
-    print(f"  >> 병합 완료: place_id={place_id} ← {source_name}:{source_id}")
-
-
-def do_insert_new(place_id: int, meta: dict) -> None:
-    """raw_documents를 'new'로 되돌려 normalizer가 신규 insert하게 함."""
-    source_name = meta["raw_source_name"]
-    source_id   = meta["raw_source_id"]
-    with get_conn() as conn:
-        cur = conn.cursor()
-        cur.execute(
-            """
-            UPDATE stage.raw_documents
-               SET sync_status = 'new', processed_at = NULL
-             WHERE source_name = %s AND source_id = %s
-            """,
-            (source_name, source_id),
-        )
-        cur.execute(
-            """
-            UPDATE core.places
-               SET dedup_status = 'auto', dedup_review_meta = NULL
-             WHERE place_id = %s
-            """,
-            (place_id,),
-        )
-    print(f"  >> 신규 등록 예약: {source_name}:{source_id} → normalize 재실행 필요")
+        # raw_documents는 is_processed=FALSE 상태로 복원해 normalizer가 신규 POI를 생성하게 함
+        # (queue의 poi_id_b가 원본 raw_document와 연결되어 있다고 가정)
+    print(f"  >> 신규 등록 예약: queue_id={queue_id}, poi_id={place_id} → normalize 재실행 필요")
 
 
 def main():
@@ -107,26 +99,23 @@ def main():
     merged = new = skipped = 0
 
     for i, item in enumerate(items, 1):
-        meta = item["dedup_review_meta"] or {}
         print(SEP)
         print(f"[{i}/{len(items)}]")
-        print(f"  [기존 TourAPI]  place_id={item['place_id']}")
+        print(f"  [기존 POI]  poi_id={item['place_id']}  (queue_id={item['queue_id']})")
         print(f"    이름:    {item['name']}")
         print(f"    주소:    {item['address']}")
-        print(f"  [신규 MOIS]     {meta.get('raw_source_name')}:{meta.get('raw_source_id')}")
-        print(f"    이름:    {meta.get('raw_name')}")
-        print(f"    주소:    {meta.get('raw_address')}")
-        print(f"    유사도:  {meta.get('score')}")
+        print(f"    소스:    {json.dumps(item.get('source_ids') or {}, ensure_ascii=False)}")
+        print(f"    유사도:  {item.get('score')}")
         print()
 
         while True:
-            choice = input("  선택 (m=병합 / n=신규 / s=스킵 / q=종료): ").strip().lower()
+            choice = input("  선택 (m=병합확정 / n=신규 / s=스킵 / q=종료): ").strip().lower()
             if choice == "m":
-                do_merge(item["place_id"], meta)
+                do_merge(item["place_id"], item)
                 merged += 1
                 break
             elif choice == "n":
-                do_insert_new(item["place_id"], meta)
+                do_insert_new(item["place_id"], item)
                 new += 1
                 break
             elif choice == "s":

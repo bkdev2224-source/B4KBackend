@@ -20,8 +20,8 @@ B4KBackend 전체 데이터 파이프라인의 실행 흐름, 의존성, 스케�
 ## 전체 파이프라인 의존성 그래프
 
 ```
-Phase 0: init_db
-    └─ Phase 1:
+Phase 0: init_db  (db/ddl/*.sql 순차 실행)
+    └─ Phase 1: TourAPI
         1-1: CSV 수집        → stage.raw_documents
         1-2: API Sync        → stage.raw_documents (modified)
         1-3: Normalize       → core.places (requires 1-1 or 1-2)
@@ -31,11 +31,16 @@ Phase 0: init_db
         1-7a: Translate Submit → translation_fill_queue (requires 1-3)
         1-7b: Translate Collect → place_translations (requires 1-7a, async 24h)
         1-8: Index           → service.search_index (requires 1-3)
-    └─ Phase 2:
+    └─ Phase 2: MOIS
         2-1: MOIS CSV        → stage.raw_documents
         2-2: Dedup           → core.places (requires Phase 1 완료)
         2-3: Normalize       → (dedup 이후 신규 INSERT된 것만)
         2-x: 번역/이미지/인덱스 (Phase 1과 동일)
+    └─ Phase E: 엔티티 (수동 운영, 별도 스크립트 미작성)
+        E-1: 엔티티 등록     → core.entities (수동 INSERT 또는 전용 스크립트)
+        E-2: 엔티티 번역     → TranslationOrchestrator.run() ④ EntityTranslationRunner
+        E-3: 이미지 업로드   → entity_images (ImagePipeline 확장 필요)
+        E-4: 관계 등록       → entity_entity_map, poi_entity_map (수동)
 ```
 
 ## 오류 처리 패턴

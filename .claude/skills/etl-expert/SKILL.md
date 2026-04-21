@@ -52,9 +52,10 @@ pipeline/normalizer/base.py
 
 1. **address_detail 정규화** — addr2 처리가 간단함. 도로명/지번 분리 가능.
 2. **품질 스코어 고도화** — 현재 3개 필드만. description, phone, image 유무 반영 가능.
-3. **좌표 이상값 로깅** — WGS84 범위 벗어난 데이터 통계 누락.
+3. ~~**좌표 이상값 로깅**~~ — **완료.** `_batch_upsert_places`에서 WGS84 범위 초과 시 `logger.debug` 로그 추가됨 (`pipeline/normalizer/base.py`).
 4. **도메인 매핑 미분류** — source_category가 domain_map에 없으면 display_domain=NULL. fallback 로직 개선 가능.
 5. **멱등성 재확인** — modified 행 재처리 시 is_retranslation=True로 번역 큐 재등록됨. 의도 확인.
+6. **엔티티 번역 큐** — `core.entity_translation_queue`는 ETL이 아닌 수동 등록 또는 별도 스크립트로 채움. 엔티티 normalizer 부재.
 
 ## 응답 스타일
 

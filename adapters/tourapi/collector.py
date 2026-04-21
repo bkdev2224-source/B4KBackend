@@ -114,6 +114,7 @@ class TourApiCollector:
                 new_cnt += n
                 mod_cnt += m
                 processed += len(batch)
+                conn.commit()
 
                 if processed % _LOG_INTERVAL == 0:
                     logger.info(
@@ -168,50 +169,55 @@ class TourApiCollector:
         new_cnt = mod_cnt = 0
         cur = conn.cursor()
 
-        sql = """
-            INSERT INTO stage.raw_documents (source_name, source_id, raw_data, sync_status, collected_at)
-            VALUES %s
-            ON CONFLICT (source_name, source_id) DO UPDATE
-              SET raw_data    = EXCLUDED.raw_data,
-                  sync_status = CASE
-                                  WHEN stage.raw_documents.raw_data = EXCLUDED.raw_data THEN stage.raw_documents.sync_status
-                                  ELSE 'modified'
-                                END,
-                  collected_at = now()
-            RETURNING (xmax = 0) AS is_insert
-        """
+        # 소스 정수 ID 조회 (캐시 없이 매번: 배치 단위라 비용 미미)
+        cur.execute(
+            "SELECT id FROM stage.api_sources WHERE name = %s",
+            (self.SOURCE_NAME,),
+        )
+        src_row = cur.fetchone()
+        if not src_row:
+            logger.error("[1-1] stage.api_sources에 '%s' 미등록 — 적재 불가", self.SOURCE_NAME)
+            return 0, 0
+        api_source_id = src_row["id"]
 
-        # 1. 한 번에 밀어넣을 데이터 리스트 생성
         data_list = []
         for row in rows:
-            source_id = row.get("contentid") or row.get("id") or ""
-            if not source_id:
+            external_id = str(row.get("contentid") or row.get("id") or "").strip()
+            if not external_id:
                 continue
-
             normalized = self._normalize_row(row)
-            # 템플릿: (source_name, source_id, raw_data)
             data_list.append((
-                self.SOURCE_NAME, 
-                source_id, 
-                json.dumps(normalized, ensure_ascii=False)
+                api_source_id,
+                external_id,
+                json.dumps(normalized, ensure_ascii=False),
             ))
 
         if not data_list:
             return 0, 0
 
-        # 2. execute_values를 이용해 단 1번의 쿼리로 처리 (압도적 속도 향상)
-        # 템플릿에 'new'와 now()를 포함시켜 매핑해줍니다.
         results = psycopg2.extras.execute_values(
-            cur, 
-            sql, 
-            data_list, 
-            template="(%s, %s, %s, 'new', now())",
-            fetch=True
+            cur,
+            """
+            INSERT INTO stage.raw_documents
+                (source_id, external_id, raw_json, is_processed, collected_at)
+            VALUES %s
+            ON CONFLICT (source_id, external_id, language_code) DO UPDATE
+              SET raw_json      = EXCLUDED.raw_json,
+                  is_processed  = CASE
+                                    WHEN stage.raw_documents.raw_json = EXCLUDED.raw_json
+                                    THEN stage.raw_documents.is_processed
+                                    ELSE FALSE
+                                  END,
+                  collected_at  = now()
+            RETURNING (xmax = 0) AS is_insert
+            """,
+            data_list,
+            template="(%s, %s, %s, FALSE, now())",
+            fetch=True,
         )
 
-        # 3. RETURNING 결과 집계
         for res in results:
-            if res["is_insert"]:  # [0]을 ["is_insert"]로 변경!
+            if res["is_insert"]:
                 new_cnt += 1
             else:
                 mod_cnt += 1
@@ -232,17 +238,36 @@ class TourApiCollector:
 
         return out
 
+    def _get_source_id(self, conn) -> int:
+        """stage.api_sources에서 source name으로 정수 ID 반환. 없으면 자동 등록."""
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM stage.api_sources WHERE name = %s", (self.SOURCE_NAME,))
+        row = cur.fetchone()
+        if row:
+            return row["id"]
+        cur.execute(
+            "INSERT INTO stage.api_sources (name, display_name) VALUES (%s, %s) RETURNING id",
+            (self.SOURCE_NAME, self.SOURCE_NAME),
+        )
+        conn.commit()
+        return cur.fetchone()["id"]
+
     def _create_sync_run(self, run_type: str) -> int:
+        # v3 run_type CHECK: 'full_load' | 'fetch_updated'
+        _type_map = {"full": "full_load", "incremental": "fetch_updated"}
+        db_run_type = _type_map.get(run_type, run_type)
         with get_conn() as conn:
+            source_id = self._get_source_id(conn)
             cur = conn.cursor()
             cur.execute(
                 """
-                INSERT INTO stage.sync_runs (source_name, run_type, status)
+                INSERT INTO stage.sync_runs (source_id, run_type, status)
                 VALUES (%s, %s, 'running')
                 RETURNING id
                 """,
-                (self.SOURCE_NAME, run_type),
+                (source_id, db_run_type),
             )
+            conn.commit()
             return cur.fetchone()["id"]
 
     def _update_sync_run(
@@ -252,26 +277,27 @@ class TourApiCollector:
         status: str,
         new_cnt: int,
         mod_cnt: int,
-        del_cnt: int,
+        del_cnt: int = 0,
     ) -> None:
         cur = conn.cursor()
         cur.execute(
             """
             UPDATE stage.sync_runs
                SET status = %s, finished_at = now(),
-                   new_count = %s, modified_count = %s, deleted_count = %s
+                   records_collected = %s
              WHERE id = %s
             """,
-            (status, new_cnt, mod_cnt, del_cnt, run_id),
+            (status, new_cnt + mod_cnt, run_id),
         )
 
     def _update_sync_state(self, conn, run_id: int) -> None:
         cur = conn.cursor()
+        # v3 source_sync_state uses source_id (FK), no last_run_id column
         cur.execute(
             """
             UPDATE stage.source_sync_state
-               SET last_synced_at = now(), last_run_id = %s
-             WHERE source_name = %s
+               SET last_synced_at = now()
+             WHERE source_id = (SELECT id FROM stage.api_sources WHERE name = %s)
             """,
-            (run_id, self.SOURCE_NAME),
+            (self.SOURCE_NAME,),
         )

@@ -1,6 +1,6 @@
 ---
 name: translation-quality-expert
-description: B4KBackend 번역 품질 전문가. 용어집(glossary)과 번역 규칙(rules)을 DB에 구축·관리하고, 번역기 프롬프트에 주입하는 방식을 설계한다. 키워드: 용어집, glossary, 번역 규칙, translation_rules, translation_glossary, 용어 통일, 번역 품질, 고유명사, 브랜드, 음식명, 관광지명, 문체, preserve, term, style, format, 규칙 추가, 규칙 수정, 용어 추가, 번역 일관성.
+description: B4KBackend 번역 품질 전문가. 용어집(glossary)과 번역 규칙(rules)을 DB에 구축·관리하고, 번역기 프롬프트에 주입하는 방식을 설계한다. 키워드: 용어집, glossary, 번역 규칙, translation_rules, translation_glossary, 용어 통일, 번역 품질, 고유명사, 브랜드, 음식명, 관광지명, 문체, preserve, term, style, format, 규칙 추가, 규칙 수정, 용어 추가, 번역 일관성, 아티스트, kpop, kbeauty, 엔티티번역, entity_translations.
 ---
 
 # 번역 품질 전문가
@@ -22,10 +22,70 @@ B4KBackend의 번역 품질을 DB에서 중앙 관리하는 전문가.
 
 ## 담당 파일
 
-- `database/schema.sql` — 두 테이블 DDL
+- `database/schema.sql` — 두 테이블 DDL (place 번역 관련)
+- `db/ddl/05_entities.sql` — `core.entity_translations`, `core.entity_translation_queue` DDL
 - `pipeline/translator/_utils.py` — `load_translation_rules`, `load_translation_glossary`, `load_prompt_additions`
 - `pipeline/translator/gemini_translator.py` — `load_prompt_additions(lang)` 호출
 - `pipeline/translator/deepseek_translator.py` — `load_prompt_additions(lang)` 호출
+
+## 엔티티 번역 적용 범위
+
+**glossary와 rules는 place 번역뿐 아니라 entity 번역에도 동일하게 적용된다.**  
+`EntityTranslationRunner`도 동일한 `load_prompt_additions(lang)`을 사용하므로, glossary에 추가한 K-pop 아티스트명·브랜드명은 엔티티 번역 시에도 즉시 반영된다.
+
+### 엔티티 타입별 glossary 우선순위
+
+| 엔티티 타입 | 핵심 glossary 카테고리 | 예시 |
+|------------|----------------------|------|
+| `kpop_artist` | 아티스트명, 팬덤명, 앨범/곡명 | aespa → 에스파, ARMY → 아미 |
+| `kbeauty_brand` | 브랜드명, 제품 라인명 | Innisfree → 이니스프리, COSRX → 코스알엑스 |
+| `kdrama_show` | 드라마/영화 제목, 배역명 | 오징어게임 → Squid Game |
+
+### K-pop 아티스트명 glossary 예시
+
+```sql
+-- K-pop 아티스트: 한국어 원문 ↔ 공식 영문 표기 (en 기준)
+INSERT INTO core.translation_glossary (term_ko, lang, translation, category, note)
+VALUES
+  ('에스파',   'en', 'aespa',   '아티스트', '공식 영문 표기'),
+  ('방탄소년단','en', 'BTS',     '아티스트', '공식 영문 약칭'),
+  ('블랙핑크', 'en', 'BLACKPINK','아티스트', '공식 영문 표기'),
+  ('뉴진스',   'en', 'NewJeans', '아티스트', '공식 영문 표기'),
+  ('세븐틴',   'en', 'SEVENTEEN','아티스트', '공식 영문 표기');
+
+-- 팬덤명 고정
+INSERT INTO core.translation_glossary (term_ko, lang, translation, category)
+VALUES
+  ('아미',  'en', 'ARMY',  '팬덤'),
+  ('블링크','en', 'BLINK', '팬덤'),
+  ('카리나','en', 'Karina','멤버명');
+
+-- K-beauty 브랜드
+INSERT INTO core.translation_glossary (term_ko, lang, translation, category, note)
+VALUES
+  ('이니스프리',  'en', 'Innisfree', '브랜드', '공식 영문 브랜드명'),
+  ('에뛰드하우스','en', 'Etude House','브랜드', '공식 영문 브랜드명'),
+  ('설화수',      'en', 'Sulwhasoo', '브랜드', '공식 영문 브랜드명'),
+  ('코스알엑스',  'en', 'COSRX',     '브랜드', '공식 영문 약칭');
+```
+
+### 아티스트명 preserve rule (전 언어 공통)
+
+```sql
+-- 영문 아티스트명을 다른 언어 번역 시에도 원문 유지
+INSERT INTO core.translation_rules (rule_type, lang, rule_text, priority)
+VALUES
+  ('preserve', NULL,
+   'For K-pop group or artist names that have an official English name (e.g., aespa, BTS, BLACKPINK, NewJeans), keep the official English name regardless of target language unless a widely-used localized form exists.',
+   9);
+
+-- K-drama 공식 제목 보존
+INSERT INTO core.translation_rules (rule_type, lang, rule_text, priority)
+VALUES
+  ('preserve', NULL,
+   'For K-drama or K-movie titles with an official English title registered on Netflix/Disney+, use the official English title (e.g., 오징어게임 → Squid Game, 이상한 변호사 우영우 → Extraordinary Attorney Woo).',
+   9);
+```
 
 ## core.translation_rules 스키마
 

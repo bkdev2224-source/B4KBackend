@@ -170,18 +170,16 @@ def search_places(
     # 좌표 기반 정렬
     order_sql = "s.quality_score DESC NULLS LAST"
     if lat and lng:
-        where.append(
-            "p.coords IS NOT NULL"
-        )
-        order_sql = f"ST_Distance(p.coords, ST_SetSRID(ST_MakePoint({lng}, {lat}), 4326)::geography)"
+        where.append("p.geom IS NOT NULL")
+        order_sql = f"ST_Distance(p.geom::geography, ST_SetSRID(ST_MakePoint({lng}, {lat}), 4326)::geography)"
 
     with get_conn() as conn:
         cur = conn.cursor()
         cur.execute(
             f"""
-            SELECT s.*, p.coords
+            SELECT s.*, ST_Y(p.geom) AS geom_lat, ST_X(p.geom) AS geom_lng
               FROM service.places_snapshot s
-              JOIN core.places p ON p.place_id = s.place_id
+              JOIN core.poi p ON p.id = s.place_id
              WHERE {where_sql}
              ORDER BY {order_sql}
              LIMIT %s OFFSET %s
@@ -191,10 +189,9 @@ def search_places(
         rows = cur.fetchall()
 
         cur.execute(
-            f"SELECT COUNT(*) AS cnt FROM service.places_snapshot s JOIN core.places p ON p.place_id=s.place_id WHERE {where_sql}",
+            f"SELECT COUNT(*) AS cnt FROM service.places_snapshot s JOIN core.poi p ON p.id = s.place_id WHERE {where_sql}",
             params,
         )
-        total = cur.fetchone()["cnt"]
 
     return PlaceList(
         total=total,
