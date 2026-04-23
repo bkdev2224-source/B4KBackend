@@ -17,6 +17,9 @@ import logging
 import re
 from typing import Any
 
+# N호점 패턴: 한쪽에만 있으면 별개 지점으로 강제 분리
+_NUMBERED_BRANCH_RE = re.compile(r"\d+호점")
+
 from fuzzywuzzy import fuzz
 from jaro import jaro_winkler_metric
 
@@ -72,6 +75,16 @@ class DedupEnsemble:
                 else:
                     # Step 2: 앙상블 스코어
                     best_score, best_candidate = self._score_candidates(name, candidates)
+
+                    # Step 2.5: N호점 충돌 감지 — 한쪽에만 있으면 별개 지점으로 강제 신규
+                    if self._numbered_branch_conflict(name, best_candidate["name"] or ""):
+                        logger.debug(
+                            "[2-4] N호점 충돌 → 신규 INSERT (source_id=%s, '%s' vs '%s')",
+                            raw["source_id"], name, best_candidate["name"],
+                        )
+                        self._insert_new(raw, source_name)
+                        results["inserted"] += 1
+                        continue
 
                     # Step 3: 분기
                     if best_score >= settings.dedup_auto_merge_threshold:
@@ -191,6 +204,16 @@ class DedupEnsemble:
             else:
                 result.append(ch)
         return "".join(result)
+
+    @staticmethod
+    def _numbered_branch_conflict(name_a: str, name_b: str) -> bool:
+        """한쪽에만 N호점 패턴이 있으면 True → 별개 지점으로 강제 분리.
+        예) '스타벅스 강남역점' vs '스타벅스 강남역2호점' → True
+            '스타벅스 강남역2호점' vs '스타벅스 강남역3호점' → False (둘 다 있음, 스코어로 판단)
+        """
+        has_a = bool(_NUMBERED_BRANCH_RE.search(name_a))
+        has_b = bool(_NUMBERED_BRANCH_RE.search(name_b))
+        return has_a != has_b
 
     @staticmethod
     def _safe_float(val: Any) -> float | None:
